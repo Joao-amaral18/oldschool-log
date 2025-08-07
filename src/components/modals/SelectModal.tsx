@@ -41,7 +41,7 @@ export function SelectModal({
                     {options.map((option, index) => (
                         <Card
                             key={option.value}
-                            className="p-3 cursor-pointer transition-colors hover:border-primary hover:bg-primary/5"
+                            className="p-3 cursor-pointer transition-all duration-200 hover:border-zinc-500 hover:bg-accent/60"
                             onClick={() => handleSelect(option.value)}
                         >
                             <div className="flex items-center justify-between">

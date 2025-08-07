@@ -83,7 +83,7 @@ export default function TemplatesPage() {
           </div>
         )}
         {templates.map((t) => (
-          <Card key={t.id} className="surface transition-colors hover:border-primary">
+          <Card key={t.id} className="surface transition-all duration-200 hover:border-zinc-500 hover:bg-accent/60">
             <CardContent className="flex items-center justify-between">
               <div
                 className="flex-1 cursor-pointer"

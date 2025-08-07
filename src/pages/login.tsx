@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -20,9 +20,11 @@ export default function LoginPage() {
   const [isSignup, setIsSignup] = useState(false)
   const [error, setError] = useState('')
 
-  if (session) {
-    navigate('/treino', { replace: true })
-  }
+  useEffect(() => {
+    if (session) {
+      navigate('/treino', { replace: true })
+    }
+  }, [session, navigate])
 
   // Helper function to check if input is email
   const isEmail = (input: string) => {

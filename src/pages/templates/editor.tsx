@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { ChevronDown, ChevronUp, Plus, Trash2, Dumbbell } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 
 export default function TemplateEditorPage() {
@@ -18,6 +18,7 @@ export default function TemplateEditorPage() {
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(false)
+  const [setRowsByExercise, setSetRowsByExercise] = useState<Record<string, Array<{ reps: number; load: number; restSec: number }>>>({})
 
   const load = async () => {
     try {
@@ -28,9 +29,16 @@ export default function TemplateEditorPage() {
         return
       }
       setTemplate(t)
-      const uniqueIds = Array.from(new Set(t.exercises.map((e) => e.exerciseId)))
-      const ex = await api.getExercisesByIds(uniqueIds)
+      // Load all user's exercises for selection (not only those in the template)
+      const ex = await api.listExercises()
       setExercises(ex)
+      // Initialize set rows per exercise based on current aggregate fields
+      const initial: Record<string, Array<{ reps: number; load: number; restSec: number }>> = {}
+      for (const te of t.exercises) {
+        const rows = Array.from({ length: Math.max(1, te.sets || 1) }, () => ({ reps: te.reps || 0, load: te.load || 0, restSec: te.restSec || 60 }))
+        initial[te.id] = rows
+      }
+      setSetRowsByExercise(initial)
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao carregar template')
       navigate('/templates')
@@ -51,19 +59,22 @@ export default function TemplateEditorPage() {
 
   const setName = (name: string) => setTemplate({ ...template, name })
 
+  // helper removed
+
   const addExercise = () => {
     const item: TemplateExercise = {
       id: crypto.randomUUID(),
       exerciseId: exercises[0]?.id ?? '',
-      sets: 3,
+      sets: 1,
       reps: 10,
       load: 0,
       restSec: 60,
     }
     setTemplate({ ...template, exercises: [...template.exercises, item] })
+    setSetRowsByExercise((prev) => ({ ...prev, [item.id]: [{ reps: 10, load: 0, restSec: 60 }] }))
   }
 
-  const addNewExercise = async () => {
+  const addNewExercise = async (assignToExerciseId?: string) => {
     const name = await modal.prompt({
       title: 'Novo Exercício',
       description: 'Digite o nome do novo exercício:',
@@ -96,16 +107,21 @@ export default function TemplateEditorPage() {
     try {
       const created = await api.createExercise({ name: name.trim(), muscleGroup: group as Exercise['muscleGroup'] })
       setExercises((prev) => [...prev, created])
-      const item: TemplateExercise = {
-        id: crypto.randomUUID(),
-        exerciseId: created.id,
-        sets: 3,
-        reps: 10,
-        load: 0,
-        restSec: 60,
+      if (assignToExerciseId) {
+        updateExercise(assignToExerciseId, { exerciseId: created.id })
+      } else {
+        const item: TemplateExercise = {
+          id: crypto.randomUUID(),
+          exerciseId: created.id,
+          sets: 1,
+          reps: 10,
+          load: 0,
+          restSec: 60,
+        }
+        setTemplate({ ...template, exercises: [...template.exercises, item] })
+        setSetRowsByExercise((prev) => ({ ...prev, [item.id]: [{ reps: 10, load: 0, restSec: 60 }] }))
       }
-      setTemplate({ ...template, exercises: [...template.exercises, item] })
-      toast.success('Novo exercício adicionado!')
+      toast.success('Novo exercício criado!')
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao criar exercício')
     }
@@ -118,6 +134,11 @@ export default function TemplateEditorPage() {
 
   const removeExercise = (id: string) => {
     setTemplate({ ...template, exercises: template.exercises.filter((e) => e.id !== id) })
+    setSetRowsByExercise((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
   }
 
   const moveExercise = (id: string, dir: -1 | 1) => {
@@ -133,7 +154,44 @@ export default function TemplateEditorPage() {
 
   const saveTemplate = async () => {
     try {
-      await api.saveTemplateFull(template)
+      // Validation guard: name, at least one exercise, exercise selected and at least one set row
+      const nameTrimmed = template.name.trim()
+      if (!nameTrimmed) {
+        toast.error('Digite um nome para o template')
+        return
+      }
+      if (template.exercises.length === 0) {
+        toast.error('Adicione pelo menos 1 exercício')
+        return
+      }
+      for (const e of template.exercises) {
+        if (!e.exerciseId) {
+          toast.error('Selecione um exercício para cada linha')
+          return
+        }
+        const rows = setRowsByExercise[e.id]
+        if (rows && rows.length === 0) {
+          toast.error('Cada exercício deve ter pelo menos 1 série')
+          return
+        }
+      }
+      // Map set rows back to aggregate fields for persistence
+      const mapped: WorkoutTemplate = {
+        ...template,
+        exercises: template.exercises.map((e) => {
+          const rows = setRowsByExercise[e.id] && setRowsByExercise[e.id].length > 0
+            ? setRowsByExercise[e.id]
+            : [{ reps: e.reps ?? 10, load: e.load ?? 0, restSec: e.restSec ?? 60 }]
+          return {
+            ...e,
+            sets: rows.length,
+            reps: rows[0]?.reps ?? e.reps,
+            load: rows[0]?.load ?? e.load,
+            restSec: rows[0]?.restSec ?? e.restSec,
+          }
+        })
+      }
+      await api.saveTemplateFull(mapped)
       toast.success('Template salvo!')
       navigate('/templates')
     } catch (e: any) {
@@ -141,12 +199,49 @@ export default function TemplateEditorPage() {
     }
   }
 
+  const addSetRow = (exerciseId: string) => {
+    setSetRowsByExercise((prev) => {
+      const rows = prev[exerciseId] ?? []
+      const last = rows[rows.length - 1] ?? { reps: 10, load: 0, restSec: 60 }
+      return { ...prev, [exerciseId]: [...rows, { ...last }] }
+    })
+  }
+
+  const removeSetRow = (exerciseId: string, rowIndex: number) => {
+    setSetRowsByExercise((prev) => {
+      const rows = (prev[exerciseId] ?? []).slice()
+      if (rows.length <= 1) return prev
+      rows.splice(rowIndex, 1)
+      return { ...prev, [exerciseId]: rows }
+    })
+  }
+
+  const updateSetRow = (exerciseId: string, rowIndex: number, patch: Partial<{ reps: number; load: number; restSec: number }>) => {
+    setSetRowsByExercise((prev) => {
+      const rows = (prev[exerciseId] ?? []).slice()
+      rows[rowIndex] = { ...rows[rowIndex], ...patch }
+      return { ...prev, [exerciseId]: rows }
+    })
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      {/* Sticky sub-header */}
+      <div className="sticky top-2 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border rounded-xl p-3 flex items-center justify-between gap-3 surface">
         <Input className="max-w-md text-lg font-semibold" value={template.name} onChange={(e) => setName(e.target.value)} />
         <div className="flex items-center gap-2">
-          <Button onClick={saveTemplate} disabled={loading}>Salvar</Button>
+          <Button
+            onClick={saveTemplate}
+            disabled={
+              loading ||
+              !template.name.trim() ||
+              template.exercises.length === 0 ||
+              template.exercises.some((e) => !e.exerciseId || (setRowsByExercise[e.id]?.length === 0))
+            }
+            className="glow"
+          >
+            Salvar
+          </Button>
           <Button variant="outline" onClick={() => navigate('/templates')}>Voltar</Button>
         </div>
       </div>
@@ -156,17 +251,23 @@ export default function TemplateEditorPage() {
           <Card key={te.id}>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
-                <select
-                  className="rounded-md border px-3 py-2 text-sm"
-                  value={te.exerciseId}
-                  onChange={(e) => updateExercise(te.id, { exerciseId: e.target.value })}
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const picked = await modal.pickExercise({
+                      title: 'Selecionar exercício',
+                      description: 'Busque, filtre e selecione um exercício',
+                      exercises,
+                      allowCreate: true,
+                      onCreate: async () => {
+                        await addNewExercise(te.id)
+                      },
+                    })
+                    if (picked) updateExercise(te.id, { exerciseId: picked })
+                  }}
                 >
-                  {exercises.map((ex) => (
-                    <option key={ex.id} value={ex.id}>
-                      {ex.name}
-                    </option>
-                  ))}
-                </select>
+                  {exercises.find((e) => e.id === te.exerciseId)?.name || 'Selecione exercício'}
+                </Button>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" onClick={() => moveExercise(te.id, -1)} disabled={idx === 0}>
                     <ChevronUp size={16} />
@@ -185,33 +286,56 @@ export default function TemplateEditorPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                <label className="text-sm space-y-1">
-                  <span className="block text-muted-foreground">Séries</span>
-                  <Input type="number" value={te.sets} onChange={(e) => updateExercise(te.id, { sets: Number(e.target.value) })} />
-                </label>
-                <label className="text-sm space-y-1">
-                  <span className="block text-muted-foreground">Reps</span>
-                  <Input type="number" value={te.reps} onChange={(e) => updateExercise(te.id, { reps: Number(e.target.value) })} />
-                </label>
-                <label className="text-sm space-y-1">
-                  <span className="block text-muted-foreground">Carga</span>
-                  <Input type="number" value={te.load} onChange={(e) => updateExercise(te.id, { load: Number(e.target.value) })} />
-                </label>
-                <label className="text-sm space-y-1">
-                  <span className="block text-muted-foreground">Descanso (s)</span>
-                  <Input type="number" value={te.restSec} onChange={(e) => updateExercise(te.id, { restSec: Number(e.target.value) })} />
-                </label>
+              {/* Flexible set rows */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Séries</span>
+                  <Button size="sm" variant="outline" onClick={() => addSetRow(te.id)}>
+                    <Plus className="mr-2" size={14} /> Adicionar série
+                  </Button>
+                </div>
+                <div className="grid gap-2">
+                  {(setRowsByExercise[te.id] ?? [{ reps: te.reps, load: te.load, restSec: te.restSec }]).map((row, rowIdx) => (
+                    <div key={rowIdx} className="grid grid-cols-12 items-end gap-2">
+                      <div className="col-span-3">
+                        <label className="text-sm space-y-1">
+                          <span className="block text-muted-foreground">Reps</span>
+                          <Input type="number" value={row.reps}
+                            onChange={(e) => updateSetRow(te.id, rowIdx, { reps: Number(e.target.value) })}
+                          />
+                        </label>
+                      </div>
+                      <div className="col-span-3">
+                        <label className="text-sm space-y-1">
+                          <span className="block text-muted-foreground">Carga</span>
+                          <Input type="number" value={row.load}
+                            onChange={(e) => updateSetRow(te.id, rowIdx, { load: Number(e.target.value) })}
+                          />
+                        </label>
+                      </div>
+                      <div className="col-span-4">
+                        <label className="text-sm space-y-1">
+                          <span className="block text-muted-foreground">Descanso (s)</span>
+                          <Input type="number" value={row.restSec}
+                            onChange={(e) => updateSetRow(te.id, rowIdx, { restSec: Number(e.target.value) })}
+                          />
+                        </label>
+                      </div>
+                      <div className="col-span-2 flex items-end">
+                        <Button variant="ghost" size="icon" onClick={() => removeSetRow(te.id, rowIdx)} disabled={(setRowsByExercise[te.id]?.length ?? 1) <= 1}>
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
         ))}
-        <div className="flex gap-2">
+        <div className="flex">
           <Button onClick={addExercise} className="flex-1" variant="outline">
             <Plus className="mr-2" size={16} /> Adicionar exercício
-          </Button>
-          <Button onClick={addNewExercise} variant="outline">
-            <Dumbbell className="mr-2" size={16} /> Novo exercício
           </Button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import { ConfirmModal, PromptModal, AlertModal, SelectModal } from '@/components/modals'
+import { ConfirmModal, PromptModal, AlertModal, SelectModal, ExercisePickerModal } from '@/components/modals'
 
 
 interface ConfirmOptions {
@@ -39,6 +39,7 @@ interface ModalContextValue {
     prompt: (options: PromptOptions) => Promise<string | null>
     alert: (options: AlertOptions) => Promise<void>
     select: (options: SelectOptions) => Promise<string | null>
+    pickExercise: (options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: () => Promise<void> | void }) => Promise<string | null>
 }
 
 const ModalContext = createContext<ModalContextValue | null>(null)
@@ -77,6 +78,15 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     }>({
         open: false,
         options: { title: '', options: [] },
+    })
+
+    const [exercisePickerState, setExercisePickerState] = useState<{
+        open: boolean
+        options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: () => Promise<void> | void }
+        resolve?: (value: string | null) => void
+    }>({
+        open: false,
+        options: { title: '', exercises: [] },
     })
 
     const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
@@ -120,6 +130,12 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
+    const pickExercise = useCallback((options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: () => Promise<void> | void }): Promise<string | null> => {
+        return new Promise((resolve) => {
+            setExercisePickerState({ open: true, options, resolve })
+        })
+    }, [])
+
     const closeConfirm = useCallback((confirmed = false) => {
         if (confirmState.resolve) {
             confirmState.resolve(confirmed)
@@ -145,11 +161,19 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         setSelectState(prev => ({ ...prev, open: false, resolve: undefined }))
     }, [selectState.resolve])
 
+    const closeExercisePicker = useCallback((value: string | null = null) => {
+        if (exercisePickerState.resolve) {
+            exercisePickerState.resolve(value)
+        }
+        setExercisePickerState(prev => ({ ...prev, open: false, resolve: undefined }))
+    }, [exercisePickerState.resolve])
+
     const value: ModalContextValue = {
         confirm,
         prompt,
         alert,
         select,
+        pickExercise,
     }
 
     return (
@@ -201,6 +225,18 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                             description={selectState.options.description}
                             options={selectState.options.options}
                             cancelText={selectState.options.cancelText}
+                        />
+
+                        <ExercisePickerModal
+                            open={exercisePickerState.open}
+                            onClose={() => closeExercisePicker(null)}
+                            title={exercisePickerState.options.title}
+                            description={exercisePickerState.options.description}
+                            exercises={exercisePickerState.options.exercises as any}
+                            onSelect={(value: string) => closeExercisePicker(value)}
+                            onCreateNew={exercisePickerState.options.allowCreate ? (async () => {
+                                await exercisePickerState.options.onCreate?.()
+                            }) : undefined}
                         />
                     </>
                 )

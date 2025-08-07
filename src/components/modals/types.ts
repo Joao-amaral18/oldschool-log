@@ -31,3 +31,11 @@ export interface SelectModalProps extends BaseModalProps {
     onSelect: (value: string) => void
     cancelText?: string
 }
+
+import type { Exercise } from '@/types'
+
+export interface ExercisePickerModalProps extends BaseModalProps {
+    exercises: Exercise[]
+    onSelect: (exerciseId: string) => void
+    onCreateNew?: () => void
+}
