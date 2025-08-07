@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
+import { SettingsSkeleton } from '@/components/skeletons'
 
 export default function SettingsPage() {
   const { session, logout } = useAuth()
@@ -16,13 +17,17 @@ export default function SettingsPage() {
   const modalApi = useModal()
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; item?: Exercise } | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const load = async () => {
     try {
+      setLoading(true)
       const data = await api.listExercises()
       setExercises(data)
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao carregar exercícios')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -100,6 +105,10 @@ export default function SettingsPage() {
     }
   }
 
+  if (loading) {
+    return <SettingsSkeleton />
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -124,7 +133,7 @@ export default function SettingsPage() {
         </div>
         <div className="grid gap-2">
           {exercises.map((ex) => (
-            <Card key={ex.id}>
+            <Card key={ex.id} className="surface">
               <CardContent className="flex items-center justify-between">
                 <div>
                   <div className="font-medium">{ex.name}</div>
@@ -154,7 +163,7 @@ export default function SettingsPage() {
 
       {modal && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
-          <Card className="w-full max-w-sm">
+          <Card className="w-full max-w-sm surface">
             <CardContent className="pt-6">
               <div className="mb-3 text-lg font-semibold">
                 {modal.mode === 'create' ? 'Adicionar Exercício' : 'Editar Exercício'}
@@ -200,7 +209,7 @@ function ExerciseForm({
         <Label htmlFor="ex-group">Grupo muscular</Label>
         <select
           id="ex-group"
-          className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-md border border-stone-800 px-3 py-2 text-sm"
           value={group}
           onChange={(e) => setGroup(e.target.value as Exercise['muscleGroup'])}
         >

@@ -7,18 +7,23 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Play, Settings, Plus } from 'lucide-react'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
+import { TreinoPageSkeleton } from '@/components/skeletons'
 
 export default function TreinoPage() {
     const { session } = useAuth()
     const navigate = useNavigate()
     const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
+    const [loading, setLoading] = useState(true)
 
     const load = async () => {
         try {
+            setLoading(true)
             const data = await api.listTemplates()
             setTemplates(data)
         } catch (e: any) {
             toast.error(e?.message || 'Erro ao carregar templates')
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -29,6 +34,10 @@ export default function TreinoPage() {
         }
         load()
     }, [session])
+
+    if (loading) {
+        return <TreinoPageSkeleton />
+    }
 
     return (
         <div className="space-y-6">
@@ -54,7 +63,7 @@ export default function TreinoPage() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                     {templates.map((template) => (
-                        <Card key={template.id} className="surface overflow-hidden transition-colors hover:border-primary">
+                        <Card key={template.id} className="surface overflow-hidden transition-all duration-200 hover:border-zinc-500 hover:bg-accent/60">
                             <CardContent className="p-6">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex-1">

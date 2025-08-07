@@ -23,7 +23,7 @@
     --color-accent-foreground: hsl(0 0% 90%);
     --color-destructive: hsl(0 62.8% 30.6%);
     --color-destructive-foreground: hsl(60 9.1% 97.8%);
-    --color-border: hsl(0 0% 20%); /* ~#333 */
+    --color-border: rgb(41 37 36); /* stone-800 */
     --color-input: hsl(0 0% 20%);
     --color-ring: hsl(142.1 76.2% 36.3%);
 }
@@ -53,7 +53,7 @@ body {
 
 /* Elevated sections with depth */
 .surface {
-    @apply rounded-xl border bg-card/50 backdrop-blur-sm shadow-lg ring-1 ring-white/5;
+    @apply rounded-xl border-stone-800 border bg-card/50 backdrop-blur-sm shadow-lg ring-1 ring-white/5;
 }
 
 /* Interactive elements */
@@ -66,17 +66,53 @@ body {
     @apply shadow-lg shadow-primary/20;
 }
 
+/* Skeleton loading animations */
+@keyframes shimmer {
+    0% {
+        background-position: -400% 0;
+    }
+    100% {
+        background-position: 400% 0;
+    }
+}
+
+.animate-shimmer {
+    animation: shimmer 2s ease-in-out infinite;
+    background: linear-gradient(
+        90deg,
+        #e0e0e0 0%,
+        #c0c0c0 20%,
+        #e0e0e0 40%,
+        #e0e0e0 100%
+    );
+    background-size: 400% 100%;
+}
+
+/* Dark mode skeleton colors */
+@media (prefers-color-scheme: dark) {
+    .animate-shimmer {
+        background: linear-gradient(
+            90deg,
+            rgb(41 37 36) 0%,
+            rgb(68 64 60) 20%,
+            rgb(41 37 36) 40%,
+            rgb(41 37 36) 100%
+        );
+        background-size: 400% 100%;
+    }
+}
+
 /* Login specific styles */
 .login-container {
     @apply min-h-screen bg-[#181818] flex items-center justify-center p-4;
 }
 
 .login-card {
-    @apply w-full max-w-[380px] bg-[#1F1F1F] rounded-2xl border border-[#333] shadow-2xl;
+    @apply w-full max-w-[380px] bg-[#1F1F1F] rounded-2xl border border-stone-800 shadow-2xl;
 }
 
 .login-input {
-    @apply bg-[#1F1F1F] border border-[#333] rounded-lg px-4 py-3 pl-12 text-base transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none;
+    @apply bg-[#1F1F1F] border border-stone-800 rounded-lg px-4 py-3 pl-12 text-base transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none;
 }
 
 .login-input::placeholder {

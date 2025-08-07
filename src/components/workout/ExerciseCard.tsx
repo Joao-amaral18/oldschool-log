@@ -111,10 +111,10 @@ export function ExerciseCard({
                 className={cn(
                     "liquid-card liquid-morph cursor-pointer",
                     isCompleted
-                        ? "border-primary/30 bg-primary/10 liquid-pulse"
+                        ? "border-zinc-500/30 bg-accent/20 liquid-pulse"
                         : isExpanded
-                            ? "liquid-glass-enhanced border-primary/40"
-                            : "hover:border-primary/30"
+                            ? "liquid-glass-enhanced border-zinc-500/40"
+                            : "hover:border-zinc-500/30 hover:bg-accent/60"
                 )}
                 onClick={!isExpanded ? onToggleExpand : undefined}
             >
@@ -206,7 +206,7 @@ export function ExerciseCard({
                                             <div className="flex items-center justify-between">
                                                 <span className="text-sm font-medium">Set {completedSets + 1}</span>
                                                 <select
-                                                    className="text-xs bg-muted/50 border rounded px-2 py-1"
+                                                    className="text-xs bg-muted/50 border border-stone-800 rounded px-2 py-1"
                                                     value={activeKind}
                                                     onChange={(e) => setActiveKind(e.target.value as any)}
                                                 >

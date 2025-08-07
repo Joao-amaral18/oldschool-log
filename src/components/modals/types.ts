@@ -39,3 +39,13 @@ export interface ExercisePickerModalProps extends BaseModalProps {
     onSelect: (exerciseId: string) => void
     onCreateNew?: () => void
 }
+
+import type { MuscleGroup } from '@/types'
+
+export interface CreateExerciseModalProps extends BaseModalProps {
+    onConfirm: (payload: { name: string; muscleGroup: MuscleGroup }) => void
+    confirmText?: string
+    cancelText?: string
+    defaultName?: string
+    defaultGroup?: MuscleGroup
+}

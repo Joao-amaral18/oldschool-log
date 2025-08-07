@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import { ConfirmModal, PromptModal, AlertModal, SelectModal, ExercisePickerModal } from '@/components/modals'
+import { ConfirmModal, PromptModal, AlertModal, SelectModal, ExercisePickerModal, CreateExerciseModal } from '@/components/modals'
 
 
 interface ConfirmOptions {
@@ -39,7 +39,8 @@ interface ModalContextValue {
     prompt: (options: PromptOptions) => Promise<string | null>
     alert: (options: AlertOptions) => Promise<void>
     select: (options: SelectOptions) => Promise<string | null>
-    pickExercise: (options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: () => Promise<void> | void }) => Promise<string | null>
+    pickExercise: (options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: (payload: { name: string; muscleGroup: string }) => Promise<void> | void }) => Promise<string | null>
+    createExercise: (options: { title: string; description?: string; defaultName?: string }) => Promise<{ name: string; muscleGroup: string } | null>
 }
 
 const ModalContext = createContext<ModalContextValue | null>(null)
@@ -82,7 +83,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
 
     const [exercisePickerState, setExercisePickerState] = useState<{
         open: boolean
-        options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: () => Promise<void> | void }
+        options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: (payload: { name: string; muscleGroup: string }) => Promise<void> | void }
         resolve?: (value: string | null) => void
     }>({
         open: false,
@@ -130,9 +131,21 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         })
     }, [])
 
-    const pickExercise = useCallback((options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: () => Promise<void> | void }): Promise<string | null> => {
+    const pickExercise = useCallback((options: { title: string; description?: string; exercises: Array<{ id: string; name: string; muscleGroup: any }>; allowCreate?: boolean; onCreate?: (payload: { name: string; muscleGroup: string }) => Promise<void> | void }): Promise<string | null> => {
         return new Promise((resolve) => {
             setExercisePickerState({ open: true, options, resolve })
+        })
+    }, [])
+
+    const [createExerciseState, setCreateExerciseState] = useState<{
+        open: boolean
+        options: { title: string; description?: string; defaultName?: string }
+        resolve?: (value: { name: string; muscleGroup: string } | null) => void
+    }>({ open: false, options: { title: '' } })
+
+    const createExercise = useCallback((options: { title: string; description?: string; defaultName?: string }): Promise<{ name: string; muscleGroup: string } | null> => {
+        return new Promise((resolve) => {
+            setCreateExerciseState({ open: true, options, resolve })
         })
     }, [])
 
@@ -174,6 +187,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
         alert,
         select,
         pickExercise,
+        createExercise,
     }
 
     return (
@@ -235,8 +249,25 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                             exercises={exercisePickerState.options.exercises as any}
                             onSelect={(value: string) => closeExercisePicker(value)}
                             onCreateNew={exercisePickerState.options.allowCreate ? (async () => {
-                                await exercisePickerState.options.onCreate?.()
+                                const result = await createExercise({ title: 'Novo Exercício', description: 'Defina o nome e grupo muscular:' })
+                                if (result) {
+                                    await exercisePickerState.options.onCreate?.(result)
+                                }
                             }) : undefined}
+                        />
+
+                        <CreateExerciseModal
+                            open={createExerciseState.open}
+                            onClose={() => {
+                                if (createExerciseState.resolve) createExerciseState.resolve(null)
+                                setCreateExerciseState((prev) => ({ ...prev, open: false, resolve: undefined }))
+                            }}
+                            title={createExerciseState.options.title}
+                            description={createExerciseState.options.description}
+                            onConfirm={(payload) => {
+                                if (createExerciseState.resolve) createExerciseState.resolve(payload)
+                                setCreateExerciseState((prev) => ({ ...prev, open: false, resolve: undefined }))
+                            }}
                         />
                     </>
                 )

@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { X, Clock, Plus } from 'lucide-react'
 import { ExerciseCard } from '@/components/workout/ExerciseCard'
 import { api } from '@/lib/api'
+import { SessionSkeleton } from '@/components/skeletons'
 
 export default function SessionPage() {
   const { templateId } = useParams<{ templateId: string }>()
@@ -70,13 +71,7 @@ export default function SessionPage() {
   }, [session, templateId])
 
   if (!template) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <div className="text-lg font-medium">Carregando treino...</div>
-        </div>
-      </div>
-    )
+    return <SessionSkeleton />
   }
 
   const totalSets = template.exercises.reduce((acc, e) => acc + e.sets, 0)

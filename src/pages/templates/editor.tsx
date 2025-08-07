@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { TemplateEditorSkeleton } from '@/components/skeletons'
 
 export default function TemplateEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -17,7 +18,7 @@ export default function TemplateEditorPage() {
   const modal = useModal()
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [setRowsByExercise, setSetRowsByExercise] = useState<Record<string, Array<{ reps: number; load: number; restSec: number }>>>({})
 
   const load = async () => {
@@ -55,77 +56,56 @@ export default function TemplateEditorPage() {
     if (id) load()
   }, [session, id])
 
-  if (!template) return null
+  if (loading || !template) {
+    return <TemplateEditorSkeleton />
+  }
 
   const setName = (name: string) => setTemplate({ ...template, name })
 
   // helper removed
 
-  const addExercise = () => {
-    const item: TemplateExercise = {
-      id: crypto.randomUUID(),
-      exerciseId: exercises[0]?.id ?? '',
-      sets: 1,
-      reps: 10,
-      load: 0,
-      restSec: 60,
-    }
-    setTemplate({ ...template, exercises: [...template.exercises, item] })
-    setSetRowsByExercise((prev) => ({ ...prev, [item.id]: [{ reps: 10, load: 0, restSec: 60 }] }))
-  }
-
-  const addNewExercise = async (assignToExerciseId?: string) => {
-    const name = await modal.prompt({
-      title: 'Novo Exercício',
-      description: 'Digite o nome do novo exercício:',
-      placeholder: 'Ex: Supino reto',
-    })
-
-    if (!name?.trim()) return
-
-    const groups = [
-      { value: 'chest', label: 'Peito', description: 'chest' },
-      { value: 'back', label: 'Costas', description: 'back' },
-      { value: 'legs', label: 'Pernas', description: 'legs' },
-      { value: 'shoulders', label: 'Ombros', description: 'shoulders' },
-      { value: 'biceps', label: 'Bíceps', description: 'biceps' },
-      { value: 'triceps', label: 'Tríceps', description: 'triceps' },
-      { value: 'glutes', label: 'Glúteos', description: 'glutes' },
-      { value: 'core', label: 'Core/Abdômen', description: 'core' },
-      { value: 'full-body', label: 'Corpo inteiro', description: 'full-body' },
-      { value: 'other', label: 'Outro', description: 'other' },
-    ]
-
-    const group = await modal.select({
-      title: 'Grupo Muscular',
-      description: 'Selecione o grupo muscular principal:',
-      options: groups,
-    })
-
-    if (!group) return
-
-    try {
-      const created = await api.createExercise({ name: name.trim(), muscleGroup: group as Exercise['muscleGroup'] })
-      setExercises((prev) => [...prev, created])
-      if (assignToExerciseId) {
-        updateExercise(assignToExerciseId, { exerciseId: created.id })
-      } else {
-        const item: TemplateExercise = {
-          id: crypto.randomUUID(),
-          exerciseId: created.id,
-          sets: 1,
-          reps: 10,
-          load: 0,
-          restSec: 60,
+  const addExerciseViaPicker = async () => {
+    const picked = await modal.pickExercise({
+      title: 'Selecionar exercício',
+      description: 'Busque, filtre e selecione um exercício',
+      exercises,
+      allowCreate: true,
+      onCreate: async ({ name, muscleGroup }) => {
+        try {
+          const created = await api.createExercise({ name, muscleGroup: muscleGroup as Exercise['muscleGroup'] })
+          setExercises((prev) => [...prev, created])
+          // Immediately add the newly created exercise
+          const newItem: TemplateExercise = {
+            id: crypto.randomUUID(),
+            exerciseId: created.id,
+            sets: 1,
+            reps: 10,
+            load: 0,
+            restSec: 60,
+          }
+          setTemplate((prev) => prev ? { ...prev, exercises: [...prev.exercises, newItem] } : prev)
+          setSetRowsByExercise((prev) => ({ ...prev, [newItem.id]: [{ reps: 10, load: 0, restSec: 60 }] }))
+          toast.success('Exercício criado!')
+        } catch (e: any) {
+          toast.error(e?.message || 'Erro ao criar exercício')
         }
-        setTemplate({ ...template, exercises: [...template.exercises, item] })
-        setSetRowsByExercise((prev) => ({ ...prev, [item.id]: [{ reps: 10, load: 0, restSec: 60 }] }))
+      },
+    })
+    if (picked) {
+      const item: TemplateExercise = {
+        id: crypto.randomUUID(),
+        exerciseId: picked,
+        sets: 1,
+        reps: 10,
+        load: 0,
+        restSec: 60,
       }
-      toast.success('Novo exercício criado!')
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao criar exercício')
+      setTemplate({ ...template, exercises: [...template.exercises, item] })
+      setSetRowsByExercise((prev) => ({ ...prev, [item.id]: [{ reps: 10, load: 0, restSec: 60 }] }))
     }
   }
+
+  // removed legacy addNewExercise in favor of picker-driven flow
 
   const updateExercise = (id: string, patch: Partial<TemplateExercise>) => {
     const list = template.exercises.map((e) => (e.id === id ? { ...e, ...patch } : e))
@@ -259,8 +239,15 @@ export default function TemplateEditorPage() {
                       description: 'Busque, filtre e selecione um exercício',
                       exercises,
                       allowCreate: true,
-                      onCreate: async () => {
-                        await addNewExercise(te.id)
+                      onCreate: async ({ name, muscleGroup }) => {
+                        try {
+                          const created = await api.createExercise({ name, muscleGroup: muscleGroup as Exercise['muscleGroup'] })
+                          setExercises((prev) => [...prev, created])
+                          updateExercise(te.id, { exerciseId: created.id })
+                          toast.success('Exercício criado!')
+                        } catch (e: any) {
+                          toast.error(e?.message || 'Erro ao criar exercício')
+                        }
                       },
                     })
                     if (picked) updateExercise(te.id, { exerciseId: picked })
@@ -334,7 +321,7 @@ export default function TemplateEditorPage() {
           </Card>
         ))}
         <div className="flex">
-          <Button onClick={addExercise} className="flex-1" variant="outline">
+          <Button onClick={addExerciseViaPicker} className="flex-1" variant="outline">
             <Plus className="mr-2" size={16} /> Adicionar exercício
           </Button>
         </div>

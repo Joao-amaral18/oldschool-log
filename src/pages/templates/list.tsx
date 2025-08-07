@@ -7,12 +7,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Pencil, Copy, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
+import { TemplateListSkeleton } from '@/components/skeletons'
 
 export default function TemplatesPage() {
   const { session } = useAuth()
   const navigate = useNavigate()
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const load = async () => {
     try {
@@ -36,7 +37,18 @@ export default function TemplatesPage() {
 
   const createNew = async () => {
     try {
-      const t = await api.createTemplate('Novo Template')
+      const baseName = 'Novo Template'
+      const existingNames = new Set(templates.map((t) => t.name))
+
+      // Find next available name: "Novo Template", "Novo Template (2)", "Novo Template (3)", ...
+      let uniqueName = baseName
+      if (existingNames.has(baseName)) {
+        let n = 2
+        while (existingNames.has(`${baseName} (${n})`)) n++
+        uniqueName = `${baseName} (${n})`
+      }
+
+      const t = await api.createTemplate(uniqueName)
       navigate(`/templates/${t.id}`)
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao criar template')
@@ -62,14 +74,18 @@ export default function TemplatesPage() {
     }
   }
 
+  if (loading) {
+    return <TemplateListSkeleton />
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Templates</h1>
-        <Button className="glow" onClick={createNew} disabled={loading}>Novo Template</Button>
+        <Button className="glow" onClick={createNew}>Novo Template</Button>
       </div>
       <div className="grid gap-3">
-        {templates.length === 0 && !loading && (
+        {templates.length === 0 && (
           <div className="surface p-8 text-center">
             <div className="mb-3 text-muted-foreground">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="mx-auto h-10 w-10 opacity-60">
