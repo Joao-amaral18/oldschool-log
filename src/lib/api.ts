@@ -329,9 +329,11 @@ export const api = {
     },
     // History
     async listHistories(): Promise<Array<{ id: string; templateName: string | null; startedAt: string; finishedAt: string | null; durationSec: number | null; totalSets: number }>> {
+        // Only consider workouts that were finalized (finished_at not null)
         const { data: histories, error } = await supabase
             .from('workout_histories')
             .select('id, template_id, started_at, finished_at, duration_sec')
+            .not('finished_at', 'is', null)
             .order('started_at', { ascending: false })
         if (error) throw error
         const ids = (histories || []).map((h) => h.id)
