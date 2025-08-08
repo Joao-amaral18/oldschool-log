@@ -246,6 +246,16 @@ export default function TemplateEditorPage() {
                           updateExercise(te.id, { exerciseId: created.id })
                           toast.success('Exercício criado!')
                         } catch (e: any) {
+                          // If backend inserted but returned error, try to fetch latest by name and attach
+                          try {
+                            const latest = (await api.listExercises()).find((ex) => ex.name.toLowerCase() === name.toLowerCase())
+                            if (latest) {
+                              setExercises((prev) => (prev.find((e) => e.id === latest.id) ? prev : [...prev, latest]))
+                              updateExercise(te.id, { exerciseId: latest.id })
+                              toast.success('Exercício criado!')
+                              return
+                            }
+                          } catch { }
                           toast.error(e?.message || 'Erro ao criar exercício')
                         }
                       },

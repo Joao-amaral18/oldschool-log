@@ -8,6 +8,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import type { ConfirmModalProps } from './types'
 
 export function ConfirmModal({
@@ -44,8 +46,7 @@ export function ConfirmModal({
                     </AlertDialogCancel>
                     <AlertDialogAction
                         onClick={handleConfirm}
-                        variant={variant === 'destructive' ? 'destructive' : 'default'}
-                        className="min-w-20"
+                        className={cn(buttonVariants({ variant: variant === 'destructive' ? 'destructive' : 'default' }), "min-w-20")}
                     >
                         {confirmText}
                     </AlertDialogAction>
