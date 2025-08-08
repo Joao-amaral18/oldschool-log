@@ -212,7 +212,7 @@ export function ExerciseCard({
                                         {performedSets.map((set, idx) => (
                                             <div
                                                 key={set.id}
-                                                className="flex items-center justify-between rounded-lg border border-muted bg-muted/30 px-3 py-2 opacity-70"
+                                                className="flex items-center justify-between rounded-lg border border-stone-700 border-muted bg-muted/30 px-3 py-2 opacity-70"
                                             >
                                                 <div className="text-sm text-muted-foreground">
                                                     <span className="font-medium">Set {idx + 1}:</span> {set.load}kg × {set.reps} reps
@@ -228,7 +228,7 @@ export function ExerciseCard({
                                         <motion.div
                                             initial={{ opacity: 0, scale: 0.95 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            className="flex items-center justify-between rounded-md border border-primary/20 bg-primary/5 p-3 text-sm"
+                                            className="flex items-center justify-between rounded-md border border-stone-700 border-primary/20 bg-primary/5 p-3 text-sm"
                                         >
                                             <div>Descanso: {formatSeconds(restRemaining)}</div>
                                             <Button size="sm" variant="outline" onClick={() => setRestRemaining(0)} className="border-primary text-primary">
@@ -243,7 +243,7 @@ export function ExerciseCard({
                                             <div className="flex items-center justify-between">
                                                 <span className="text-sm font-medium">Set {completedSets + 1}</span>
                                                 <select
-                                                    className="text-xs bg-muted/50 border border-stone-800 rounded px-2 py-1"
+                                                    className="text-xs bg-muted/50 border border-stone-700 rounded px-2 py-1"
                                                     value={activeKind}
                                                     onChange={(e) => setActiveKind(e.target.value as any)}
                                                 >
@@ -303,7 +303,7 @@ export function ExerciseCard({
                                     {!allSetsCompleted && (
                                         <div className="space-y-2">
                                             {Array.from({ length: Math.max(0, plannedSets - completedSets - 1) }, (_, idx) => (
-                                                <div key={idx} className="flex items-center justify-between rounded-lg border border-muted/50 bg-muted/10 px-3 py-2 opacity-50">
+                                                <div key={idx} className="flex items-center justify-between rounded-lg border border-stone-700 border-muted/50 bg-muted/10 px-3 py-2 opacity-50">
                                                     <div className="text-sm text-muted-foreground">
                                                         Set {completedSets + 2 + idx}
                                                     </div>

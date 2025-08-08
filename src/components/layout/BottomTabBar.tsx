@@ -20,11 +20,10 @@ export function BottomTabBar() {
 
     return (
         <nav
-            className={`fixed bottom-4 left-4 right-4 z-10 overflow-hidden rounded-2xl border border-border/40 bg-card/50 backdrop-blur-xl transition-transform duration-300 md:hidden ${
-                scrollDirection === 'down'
+            className={`fixed bottom-4 left-4 right-4 z-10 overflow-hidden rounded-2xl border border-stone-700 border-border/40 bg-card/50 backdrop-blur-xl transition-transform duration-300 md:hidden ${scrollDirection === 'down'
                     ? 'translate-y-[calc(100%+2rem)]'
                     : 'translate-y-0'
-            }`}
+                }`}
         >
             <div className="flex justify-around items-center h-16">
                 {tabs.map((tab) => (
@@ -32,12 +31,11 @@ export function BottomTabBar() {
                         key={tab.path}
                         to={tab.path}
                         className={({ isActive }) =>
-                            `relative z-20 flex-1 flex flex-col items-center justify-center text-center transition-colors duration-200 ${
-                                isActive ||
+                            `relative z-20 flex-1 flex flex-col items-center justify-center text-center transition-colors duration-200 ${isActive ||
                                 (location.pathname === '/' &&
                                     tab.path === '/treino')
-                                    ? 'text-primary'
-                                    : 'text-muted-foreground hover:text-foreground'
+                                ? 'text-primary'
+                                : 'text-muted-foreground hover:text-foreground'
                             }`
                         }
                     >

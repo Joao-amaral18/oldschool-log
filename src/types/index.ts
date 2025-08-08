@@ -3,10 +3,22 @@ export type UserSession = {
     username: string
 }
 
+export type MuscleGroup =
+    | 'chest'
+    | 'back'
+    | 'legs'
+    | 'shoulders'
+    | 'biceps'
+    | 'triceps'
+    | 'glutes'
+    | 'core'
+    | 'full-body'
+    | 'other'
+
 export type Exercise = {
     id: string
     name: string
-    muscleGroup: 'peito' | 'costas' | 'pernas' | 'ombros' | 'biceps' | 'triceps' | 'abdomen'
+    muscleGroup: MuscleGroup
 }
 
 export type TemplateExercise = {

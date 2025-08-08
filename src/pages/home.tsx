@@ -40,7 +40,7 @@ export default function HomePage() {
                 <div className="text-xs text-muted-foreground">{t.exercises.length} exercícios</div>
               </div>
               <div className="flex items-center gap-2">
-                <Link to={`/templates/${t.id}`}>
+                <Link to={`/templates/editor/${t.id}`}>
                   <Button variant="outline" size="sm">Editar</Button>
                 </Link>
                 <Link to={`/session/${t.id}`}>

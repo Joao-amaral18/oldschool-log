@@ -13,7 +13,7 @@ export function TemplateListSkeleton() {
             {/* Template cards */}
             <div className="grid gap-3">
                 {Array.from({ length: 4 }, (_, i) => (
-                    <div key={i} className="p-4 border border-stone-800 rounded-xl bg-card/50">
+                    <div key={i} className="p-4 border border-stone-700 rounded-xl bg-card/50">
                         <div className="flex items-center justify-between">
                             <div className="flex-1 space-y-2">
                                 <Skeleton variant="text" width="60%" height="20px" />
@@ -45,7 +45,7 @@ export function TreinoPageSkeleton() {
             {/* Template cards grid */}
             <div className="grid gap-4 md:grid-cols-2">
                 {Array.from({ length: 4 }, (_, i) => (
-                    <div key={i} className="p-6 border border-stone-800 rounded-xl bg-card/50">
+                    <div key={i} className="p-6 border border-stone-700 rounded-xl bg-card/50">
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex-1 space-y-2">
                                 <Skeleton variant="text" width="70%" height="24px" />
@@ -81,7 +81,7 @@ export function TemplateEditorSkeleton() {
     return (
         <div className="space-y-4">
             {/* Sticky header */}
-            <div className="sticky top-2 z-10 p-3 border border-stone-800 rounded-xl bg-card/50 flex items-center justify-between gap-3">
+            <div className="sticky top-2 z-10 p-3 border border-stone-700 rounded-xl bg-card/50 flex items-center justify-between gap-3">
                 <Skeleton variant="text" width="300px" height="40px" />
                 <div className="flex items-center gap-2">
                     <Skeleton variant="button" width="80px" height="40px" />
@@ -92,7 +92,7 @@ export function TemplateEditorSkeleton() {
             {/* Exercise cards */}
             <div className="grid gap-3">
                 {Array.from({ length: 3 }, (_, i) => (
-                    <div key={i} className="p-4 border border-stone-800 rounded-xl bg-card/50">
+                    <div key={i} className="p-4 border border-stone-700 rounded-xl bg-card/50">
                         <div className="flex items-center justify-between mb-4">
                             <Skeleton variant="button" width="200px" height="40px" />
                             <div className="flex items-center gap-1">
@@ -161,7 +161,7 @@ export function ExercisePickerSkeleton() {
             {/* Exercise list */}
             <div className="space-y-2 max-h-[50vh] overflow-hidden">
                 {Array.from({ length: 6 }, (_, i) => (
-                    <div key={i} className="p-3 border border-stone-800 rounded-lg bg-card/30">
+                    <div key={i} className="p-3 border border-stone-700 rounded-lg bg-card/30">
                         <div className="flex items-center justify-between">
                             <Skeleton variant="text" width="60%" height="16px" />
                             <Skeleton variant="text" width="20%" height="12px" />
@@ -198,7 +198,7 @@ export function SessionSkeleton() {
             </div>
 
             {/* Progress Overview */}
-            <div className="p-4 border border-stone-800 rounded-xl bg-card/50">
+            <div className="p-4 border border-stone-700 rounded-xl bg-card/50">
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <Skeleton variant="text" width="120px" height="20px" />
@@ -212,7 +212,7 @@ export function SessionSkeleton() {
             {/* Exercise cards */}
             <div className="space-y-4">
                 {Array.from({ length: 4 }, (_, i) => (
-                    <div key={i} className="p-4 border border-stone-800 rounded-xl bg-card/50">
+                    <div key={i} className="p-4 border border-stone-700 rounded-xl bg-card/50">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
                                 <Skeleton variant="avatar" className="h-5 w-5 rounded-full" />
@@ -252,7 +252,7 @@ export function HistorySkeleton() {
             <Skeleton variant="text" width="100px" height="28px" />
             <div className="grid gap-3">
                 {Array.from({ length: 6 }, (_, i) => (
-                    <div key={i} className="p-4 border border-stone-800 rounded-xl bg-card/50">
+                    <div key={i} className="p-4 border border-stone-700 rounded-xl bg-card/50">
                         <div className="flex items-center justify-between">
                             <div className="space-y-2">
                                 <Skeleton variant="text" width="160px" height="18px" />
@@ -285,7 +285,7 @@ export function SettingsSkeleton() {
                 </div>
                 <div className="grid gap-2">
                     {Array.from({ length: 8 }, (_, i) => (
-                        <div key={i} className="p-4 border border-stone-800 rounded-xl bg-card/50">
+                        <div key={i} className="p-4 border border-stone-700 rounded-xl bg-card/50">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <Skeleton variant="text" width="120px" height="18px" />

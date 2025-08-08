@@ -16,7 +16,7 @@ A clean, minimal skeleton loading system with smooth shimmer animations designed
 - **Light mode**: #E0E0E0 → #C0C0C0 → #E0E0E0
 - **Dark mode**: stone-800 → stone-600 → stone-800
 - **Duration**: 2 seconds ease-in-out infinite
-- **Border radius**: 6-8px for consistency
+- **border border-stone-700 radius**: 6-8px for consistency
 
 ## Quick Start
 
@@ -72,7 +72,7 @@ function MyPage() {
 The skeleton system integrates seamlessly with the existing design tokens:
 
 - Uses `border-stone-800` for consistent borders
-- Matches `rounded-xl` and `rounded-lg` border radius
+- Matches `rounded-xl` and `rounded-lg` border border-stone-700 radius
 - Respects `bg-card/50` opacity patterns
 - Follows spacing conventions (p-4, p-6, gap-3, etc.)
 

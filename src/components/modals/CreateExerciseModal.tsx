@@ -59,7 +59,7 @@ export function CreateExerciseModal({ open, onClose, title, description, onConfi
             <Label htmlFor="new-ex-group">Grupo muscular</Label>
             <select
               id="new-ex-group"
-              className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-md border border-stone-700 px-3 py-2 text-sm"
               value={group}
               onChange={(e) => setGroup(e.target.value as MuscleGroup)}
             >

@@ -336,7 +336,7 @@ export default function TemplateEditorPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1 rounded-md border border-stone-800 px-2 py-0.5"><Dumbbell className="h-3.5 w-3.5" /> Exercício</span>
+                    <span className="inline-flex items-center gap-1 rounded-md border border-stone-700 px-2 py-0.5"><Dumbbell className="h-3.5 w-3.5" /> Exercício</span>
                   </div>
                 </div>
 
@@ -411,7 +411,7 @@ export default function TemplateEditorPage() {
       <Sheet open={!!exerciseMenu} onOpenChange={(o) => !o && setExerciseMenu(null)}>
         <SheetContent side="bottom" className="p-4">
           <SheetHeader>
-            <SheetTitle className="text-sm">Ações do exercício</SheetTitle>
+            <SheetTitle className="text-sm p-2">Ações do exercício</SheetTitle>
           </SheetHeader>
           <div className="grid gap-2">
             <Button

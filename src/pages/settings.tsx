@@ -218,7 +218,7 @@ function ExerciseForm({
         <Label htmlFor="ex-group">Grupo muscular</Label>
         <select
           id="ex-group"
-          className="mt-1 w-full rounded-md border border-stone-800 px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-md border border-stone-700 px-3 py-2 text-sm"
           value={group}
           onChange={(e) => setGroup(e.target.value as Exercise['muscleGroup'])}
         >

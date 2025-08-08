@@ -11,7 +11,7 @@ export default function LoginPage() {
     const { login } = useAuth()
     const navigate = useNavigate()
 
-    const handleLogin = async (e) => {
+    const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         try {
             await login(email, password)

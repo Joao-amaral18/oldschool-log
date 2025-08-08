@@ -176,7 +176,6 @@ export default function SessionPage() {
       reps: setData.reps,
       load: setData.load,
       kind: setData.kind,
-      doneAt: Date.now(),
     }
     // Optimistic UI first
     setPerformedSetsState((prev) => {
@@ -406,7 +405,7 @@ export default function SessionPage() {
               <button
                 type="button"
                 onClick={() => handleExerciseToggle(idx)}
-                className={cn('flex w-full items-center gap-4 p-4 rounded-lg border bg-card transition-colors', isExpanded ? 'border-primary' : 'border-stone-800 hover:border-zinc-500')}
+                className={cn('flex w-full items-center gap-4 p-4 rounded-lg border border-stone-700 bg-card transition-colors', isExpanded ? 'border-primary' : 'border-stone-800 hover:border-zinc-500')}
               >
                 <div className="flex items-center gap-4 flex-grow text-left">
                   {isCompleted ? (<CheckCircle2 className="w-5 h-5 text-primary" />) : (<Circle className="w-5 h-5 text-muted-foreground" />)}
@@ -419,7 +418,7 @@ export default function SessionPage() {
               </button>
 
               {isExpanded && (
-                <div className="bg-card border border-t-0 rounded-b-lg p-4 space-y-4">
+                <div className="bg-card border border-stone-700 -0 rounded-b-lg p-4 space-y-4">
                   <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground px-2">
                     <div className="col-span-2 text-center">Série</div>
                     <div className="col-span-4 text-center">Carga (kg)</div>
@@ -459,7 +458,7 @@ export default function SessionPage() {
       </main>
 
       {allSetsForCurrentExerciseCompleted && (
-        <div className="p-4 w-full max-w-2xl mx-auto fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t">
+        <div className="p-4 w-full max-w-2xl mx-auto fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm ">
           <Button onClick={() => {
             const currentIdx = expandedExerciseIndex
             const nextIdx = template.exercises.findIndex((_, idx) => idx > currentIdx && !(exerciseStates[template.exercises[idx].id]?.isCompleted))

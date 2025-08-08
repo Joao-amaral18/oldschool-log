@@ -86,7 +86,7 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-xl w-full p-0 overflow-hidden rounded-xl border border-stone-800 bg-background" onKeyDown={handleKeyDown}>
+            <DialogContent className="max-w-xl w-full p-0 overflow-hidden rounded-xl border border-stone-700 bg-background" onKeyDown={handleKeyDown}>
                 <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b p-4 space-y-3">
                     <DialogHeader className="p-0">
                         <DialogTitle className="text-base md:text-lg font-semibold tracking-tight">{title}</DialogTitle>
@@ -103,7 +103,7 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
                             <button
                                 key={m.value}
                                 type="button"
-                                className={`whitespace-nowrap rounded-full border px-3 py-1 text-xs transition-colors ${group === m.value ? 'border-zinc-500 bg-accent/70' : 'border-stone-800 hover:border-zinc-500 hover:bg-accent/60'
+                                className={`whitespace-nowrap rounded-full border border-stone-700 px-3 py-1 text-xs transition-colors ${group === m.value ? 'border-zinc-500 bg-accent/70' : 'border-stone-800 hover:border-zinc-500 hover:bg-accent/60'
                                     }`}
                                 onClick={() => setGroup(m.value)}
                             >
@@ -123,11 +123,11 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
                                 type="button"
                                 role="option"
                                 aria-selected={isSelected}
-                                className={`w-full text-left p-3 cursor-pointer transition-colors duration-150 border rounded-lg ${isSelected
-                                        ? 'border-zinc-500 bg-accent/70'
-                                        : isActive
-                                            ? 'border-zinc-500/60 bg-accent/40'
-                                            : 'hover:border-zinc-500 hover:bg-accent/60'
+                                className={`w-full text-left p-3 cursor-pointer transition-colors duration-150 border border-stone-700 rounded-lg ${isSelected
+                                    ? 'border-zinc-500 bg-accent/70'
+                                    : isActive
+                                        ? 'border-zinc-500/60 bg-accent/40'
+                                        : 'hover:border-zinc-500 hover:bg-accent/60'
                                     }`}
                                 onClick={() => setSelectedId(ex.id)}
                                 onDoubleClick={() => { setSelectedId(ex.id); onSelect(ex.id); onClose() }}
@@ -137,7 +137,7 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
                                         {isSelected && <Check className="h-4 w-4 text-primary" />}
                                         <div className="font-medium text-sm tracking-tight">{ex.name}</div>
                                     </div>
-                                    <div className="text-xs text-muted-foreground px-2 py-0.5 rounded-md border border-stone-800 bg-muted/30">{muscleGroupLabels[ex.muscleGroup]}</div>
+                                    <div className="text-xs text-muted-foreground px-2 py-0.5 rounded-md border border-stone-700 bg-muted/30">{muscleGroupLabels[ex.muscleGroup]}</div>
                                 </div>
                             </button>
                         )
@@ -146,7 +146,7 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
                         <div className="text-sm text-muted-foreground text-center py-6">Nenhum exercício encontrado</div>
                     )}
                 </div>
-                <DialogFooter className="items-center gap-2 sm:justify-between border-t p-3">
+                <DialogFooter className="items-center gap-2 sm:justify-between  p-3">
                     <Button type="button" variant="link" onClick={onClose}>Cancelar</Button>
                     <div className="flex gap-2">
                         {onCreateNew && (
