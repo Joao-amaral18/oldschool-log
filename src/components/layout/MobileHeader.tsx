@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Settings, LogOut, User, X, Check } from 'lucide-react'
+import {
+    Menu,
+    Settings,
+    LogOut,
+    User,
+    X,
+    Check,
+    BarChart2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -19,7 +27,8 @@ const getPageTitle = (pathname: string): string => {
     if (pathname.startsWith('/session/')) return 'Sessão de Treino'
     if (pathname === '/history') return 'Histórico'
     if (pathname === '/analytics') return 'Analytics'
-    if (pathname.startsWith('/analytics/exercise')) return 'Progresso por Exercício'
+    if (pathname.startsWith('/analytics/exercise'))
+        return 'Progresso por Exercício'
     if (pathname.startsWith('/analytics/volume')) return 'Análise de Volume'
     if (pathname.startsWith('/analytics/habits')) return 'Hábitos'
     if (pathname.startsWith('/analytics/prs')) return 'Meus Recordes'
@@ -53,9 +62,12 @@ export function MobileHeader() {
     useEffect(() => {
         if (!isEditingTemplate) return
         const onState = (e: Event) => {
-            const detail = (e as CustomEvent).detail as { name?: string; canSave?: boolean } | undefined
+            const detail = (e as CustomEvent).detail as
+                | { name?: string; canSave?: boolean }
+                | undefined
             if (detail?.name !== undefined) setTemplateName(detail.name)
-            if (typeof detail?.canSave === 'boolean') setCanSaveTemplate(!!detail.canSave)
+            if (typeof detail?.canSave === 'boolean')
+                setCanSaveTemplate(!!detail.canSave)
         }
         window.addEventListener('template:state', onState as EventListener)
         return () => {
@@ -65,7 +77,9 @@ export function MobileHeader() {
 
     const handleTemplateNameChange = (value: string) => {
         setTemplateName(value)
-        window.dispatchEvent(new CustomEvent('template:setName', { detail: { name: value } }))
+        window.dispatchEvent(
+            new CustomEvent('template:setName', { detail: { name: value } })
+        )
     }
 
     const handleTemplateSave = () => {
@@ -73,7 +87,10 @@ export function MobileHeader() {
         window.dispatchEvent(new Event('template:save'))
     }
 
-    if (location.pathname === '/login' || location.pathname.startsWith('/session/')) {
+    if (
+        location.pathname === '/login' ||
+        location.pathname.startsWith('/session/')
+    ) {
         return null
     }
 
@@ -90,11 +107,17 @@ export function MobileHeader() {
                         <X className="h-5 w-5" />
                         <span className="sr-only">Cancelar</span>
                     </Button>
-                    <h1 className="font-semibold text-foreground">Editar Template</h1>
+                    <h1 className="font-semibold text-foreground">
+                        Editar Template
+                    </h1>
                     <Button
                         variant="ghost"
                         size="sm"
-                        className={`h-9 ${canSaveTemplate ? 'text-emerald-400' : 'text-muted-foreground'}`}
+                        className={`h-9 ${
+                            canSaveTemplate
+                                ? 'text-emerald-400'
+                                : 'text-muted-foreground'
+                        }`}
                         onClick={handleTemplateSave}
                         disabled={!canSaveTemplate}
                     >
@@ -104,7 +127,9 @@ export function MobileHeader() {
                 <div className="px-4 pb-2">
                     <Input
                         value={templateName}
-                        onChange={(e) => handleTemplateNameChange(e.target.value)}
+                        onChange={(e) =>
+                            handleTemplateNameChange(e.target.value)
+                        }
                         placeholder="Nome do template"
                         className="h-9 text-base font-medium"
                     />
@@ -125,18 +150,33 @@ export function MobileHeader() {
                     </SheetTrigger>
                     <SheetContent side="left" className="w-72">
                         <SheetHeader>
-                            <SheetTitle className="text-left">Oldschool Log</SheetTitle>
+                            <SheetTitle className="text-left">
+                                Oldschool Log
+                            </SheetTitle>
                         </SheetHeader>
                         <div className="mt-6 space-y-2">
                             {session && (
                                 <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                                     <User className="h-5 w-5 text-muted-foreground" />
                                     <div>
-                                        <div className="font-medium">{session.username}</div>
-                                        <div className="text-xs text-muted-foreground">Usuário logado</div>
+                                        <div className="font-medium">
+                                            {session.username}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Usuário logado
+                                        </div>
                                     </div>
                                 </div>
                             )}
+
+                            <Button
+                                variant="ghost"
+                                className="w-full justify-start gap-3 h-11"
+                                onClick={() => handleMenuItemClick('/analytics')}
+                            >
+                                <BarChart2 className="h-5 w-5" />
+                                Analytics
+                            </Button>
 
                             <Button
                                 variant="ghost"
