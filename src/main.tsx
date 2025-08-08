@@ -16,6 +16,19 @@ import { RequireAuth } from '@/components/guards/RequireAuth'
 import { ModalProvider } from '@/context/ModalContext'
 import { Toaster } from 'sonner'
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      navigator.serviceWorker.addEventListener('message', async (event) => {
+        if (event.data?.type === 'SYNC_SETS') {
+          // Defer to session page listeners if needed
+        }
+      })
+      return reg
+    }).catch(() => { })
+  })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>

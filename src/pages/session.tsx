@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { X, Clock, Plus } from 'lucide-react'
 import { ExerciseCard } from '@/components/workout/ExerciseCard'
 import { api } from '@/lib/api'
+import { enqueueSet, registerSync } from '@/lib/offlineQueue'
 import { SessionSkeleton } from '@/components/skeletons'
 
 export default function SessionPage() {
@@ -32,6 +33,22 @@ export default function SessionPage() {
 
   // Initialize session
   useEffect(() => {
+    const onSwMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'SYNC_SETS') {
+        // Try to flush queued sets now via API
+        try {
+          const { listQueuedPerformedSets, removeQueuedItem } = await import('@/lib/offlineQueue')
+          const queued = await listQueuedPerformedSets()
+          for (const item of queued) {
+            try {
+              await api.addPerformedSet(item.performedExerciseId, item.set)
+              await removeQueuedItem(item.id)
+            } catch { }
+          }
+        } catch { }
+      }
+    }
+    navigator.serviceWorker?.addEventListener?.('message', onSwMessage as any)
     const boot = async () => {
       if (!session) {
         navigate('/login')
@@ -65,8 +82,11 @@ export default function SessionPage() {
       }
     }
     boot()
+    // Ensure background sync is registered when session page is active
+    registerSync()
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current)
+      navigator.serviceWorker?.removeEventListener?.('message', onSwMessage as any)
     }
   }, [session, templateId])
 
@@ -91,15 +111,23 @@ export default function SessionPage() {
       kind: setData.kind,
       doneAt: Date.now(),
     }
+    // Optimistic UI first
+    setPerformedSetsState((prev) => {
+      const next = prev.map((arr) => [...arr])
+      next[exerciseIndex] = [...next[exerciseIndex], newSet]
+      return next
+    })
+
     try {
       await api.addPerformedSet(performedExerciseId, newSet)
-      setPerformedSetsState((prev) => {
-        const next = prev.map((arr) => [...arr])
-        next[exerciseIndex] = [...next[exerciseIndex], newSet]
-        return next
+    } catch {
+      // Offline or API error: enqueue for background sync
+      await enqueueSet({
+        endpoint: '/offline/sets',
+        payload: { performedExerciseId, set: newSet },
       })
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao salvar set')
+      await registerSync()
+      toast.info('Sem conexão. Série será sincronizada quando voltar internet.')
     }
   }
 
