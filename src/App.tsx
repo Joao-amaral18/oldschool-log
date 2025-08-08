@@ -28,6 +28,7 @@ function App() {
               { to: '/treino', label: 'Treino' },
               { to: '/templates', label: 'Templates' },
               { to: '/history', label: 'Histórico' },
+              { to: '/analytics', label: 'Analytics' },
               { to: '/settings', label: 'Configurações' },
             ].map((item) => (
               <Link

@@ -39,7 +39,7 @@ export async function registerSync() {
     if ('serviceWorker' in navigator && 'SyncManager' in window) {
         try {
             const reg = await navigator.serviceWorker.ready
-            await reg.sync.register('sync-sets')
+            await (reg as any).sync?.register('sync-sets')
         } catch {
             // no-op
         }

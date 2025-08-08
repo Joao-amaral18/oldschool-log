@@ -251,6 +251,82 @@ export const api = {
         if (error) throw error
     },
 
+    // Analytics helpers
+    async getSetsForWorkouts(workoutIds: string[]): Promise<Array<{ workoutId: string; startedAt: string; exerciseId: string; reps: number; load: number }>> {
+        if (workoutIds.length === 0) return []
+        // Fetch performed_exercises for these workouts
+        const { data: pes, error: peErr } = await supabase
+            .from('performed_exercises')
+            .select('id, workout_id, exercise_id')
+            .in('workout_id', workoutIds)
+        if (peErr) throw peErr
+        const peIds = (pes || []).map((r) => r.id)
+        if (peIds.length === 0) return []
+        // Fetch performed_sets for these performed exercises
+        const { data: psets, error: psErr } = await supabase
+            .from('performed_sets')
+            .select('performed_exercise_id, reps, load')
+            .in('performed_exercise_id', peIds)
+        if (psErr) throw psErr
+        // Fetch workouts to get started_at
+        const { data: workouts, error: wErr } = await supabase
+            .from('workout_histories')
+            .select('id, started_at')
+            .in('id', workoutIds)
+        if (wErr) throw wErr
+        const startedByWorkout: Record<string, string> = {}
+        for (const w of workouts || []) startedByWorkout[w.id] = w.started_at as unknown as string
+        // Build results
+        const byPe: Record<string, { workout_id: string; exercise_id: string }> = Object.fromEntries(
+            (pes || []).map((r) => [r.id, { workout_id: r.workout_id, exercise_id: r.exercise_id }])
+        )
+        const result: Array<{ workoutId: string; startedAt: string; exerciseId: string; reps: number; load: number }> = []
+        for (const s of psets || []) {
+            const meta = byPe[s.performed_exercise_id]
+            if (!meta) continue
+            result.push({
+                workoutId: meta.workout_id,
+                startedAt: startedByWorkout[meta.workout_id],
+                exerciseId: meta.exercise_id,
+                reps: s.reps as number,
+                load: Number(s.load) || 0,
+            })
+        }
+        return result
+    },
+
+    async listExerciseSetsHistory(exerciseId: string): Promise<Array<{ date: string; workoutId: string; reps: number; load: number }>> {
+        // All performed exercises with this exerciseId
+        const { data: pes, error: peErr } = await supabase
+            .from('performed_exercises')
+            .select('id, workout_id')
+            .eq('exercise_id', exerciseId)
+        if (peErr) throw peErr
+        const peIds = (pes || []).map((r) => r.id)
+        if (peIds.length === 0) return []
+        // Sets for these performed_exercises
+        const { data: psets, error: psErr } = await supabase
+            .from('performed_sets')
+            .select('performed_exercise_id, reps, load')
+            .in('performed_exercise_id', peIds)
+        if (psErr) throw psErr
+        // Fetch workouts to get date
+        const workoutIds = Array.from(new Set((pes || []).map((r) => r.workout_id)))
+        const { data: workouts, error: wErr } = await supabase
+            .from('workout_histories')
+            .select('id, started_at')
+            .in('id', workoutIds)
+        if (wErr) throw wErr
+        const startedByWorkout: Record<string, string> = {}
+        for (const w of workouts || []) startedByWorkout[w.id] = w.started_at as unknown as string
+        const peToWorkout: Record<string, string> = Object.fromEntries((pes || []).map((r) => [r.id, r.workout_id]))
+        return (psets || []).map((s) => ({
+            workoutId: peToWorkout[s.performed_exercise_id],
+            date: startedByWorkout[peToWorkout[s.performed_exercise_id]],
+            reps: s.reps as number,
+            load: Number(s.load) || 0,
+        }))
+    },
     // History
     async listHistories(): Promise<Array<{ id: string; templateName: string | null; startedAt: string; finishedAt: string | null; durationSec: number | null; totalSets: number }>> {
         const { data: histories, error } = await supabase

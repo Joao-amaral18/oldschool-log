@@ -11,6 +11,11 @@ import TemplateEditorPage from './pages/templates/editor'
 import SessionPage from './pages/session'
 import HistoryPage from './pages/history'
 import SettingsPage from './pages/settings'
+import PerformanceDashboardPage from './pages/analytics/Dashboard'
+import ExerciseProgressPage from './pages/analytics/ExerciseProgress'
+import VolumeAnalysisPage from './pages/analytics/VolumeAnalysis'
+import HabitsPage from './pages/analytics/Habits'
+import PRsPage from './pages/analytics/PRs'
 import { AuthProvider } from '@/context/AuthContext'
 import { RequireAuth } from '@/components/guards/RequireAuth'
 import { ModalProvider } from '@/context/ModalContext'
@@ -75,6 +80,46 @@ createRoot(document.getElementById('root')!).render(
                 element={
                   <RequireAuth>
                     <HistoryPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="analytics"
+                element={
+                  <RequireAuth>
+                    <PerformanceDashboardPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="analytics/exercise"
+                element={
+                  <RequireAuth>
+                    <ExerciseProgressPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="analytics/volume"
+                element={
+                  <RequireAuth>
+                    <VolumeAnalysisPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="analytics/habits"
+                element={
+                  <RequireAuth>
+                    <HabitsPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="analytics/prs"
+                element={
+                  <RequireAuth>
+                    <PRsPage />
                   </RequireAuth>
                 }
               />
