@@ -1,31 +1,44 @@
-import React from 'react'
+import React from 'react';
+import { Button } from '@/components/ui/button';
 
-export class ErrorBoundary extends React.Component<React.PropsWithChildren, { hasError: boolean; message?: string }> {
-    constructor(props: React.PropsWithChildren) {
-        super(props)
-        this.state = { hasError: false }
-    }
-    static getDerivedStateFromError(error: unknown) {
-        return { hasError: true, message: (error as any)?.message || 'Algo deu errado.' }
-    }
-    componentDidCatch(error: unknown) {
-        // log if needed
-        console.error(error)
-    }
-    render() {
-        if (this.state.hasError) {
-            return (
-                <div className="container-app py-10">
-                    <div className="surface p-6">
-                        <h1 className="text-xl font-semibold mb-2">Ocorreu um erro</h1>
-                        <p className="text-sm text-muted-foreground mb-4">{this.state.message}</p>
-                        <button className="rounded-md border px-3 py-2 text-sm" onClick={() => location.reload()}>Recarregar</button>
-                    </div>
-                </div>
-            )
-        }
-        return this.props.children
-    }
+interface ErrorBoundaryState {
+  hasError: boolean;
 }
 
+export class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
+  static getDerivedStateFromError(_: Error): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary pegou um erro:', error, errorInfo);
+  }
+
+  handleGoHome = () => {
+    window.location.href = '/';
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen text-center">
+          <h1 className="text-2xl font-bold mb-4">Oops! Algo deu errado.</h1>
+          <p className="mb-4">Pedimos desculpa pelo inconveniente.</p>
+          <Button onClick={this.handleGoHome}>
+            Ir para o Início
+          </Button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}

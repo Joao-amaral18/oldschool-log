@@ -16,6 +16,40 @@ function mapTemplateExerciseRow(row: Tables['template_exercises']['Row']): Templ
     }
 }
 
+export const fetchWorkoutTemplates = async (userId: string): Promise<WorkoutTemplate[]> => {
+    const { data: templates, error } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw new Error('Failed to fetch workout templates');
+
+    const ids = (templates || []).map((t) => t.id);
+    if (ids.length === 0) return [];
+
+    const { data: tex, error: texErr } = await supabase
+        .from('template_exercises')
+        .select('*')
+        .in('template_id', ids)
+        .order('position', { ascending: true });
+
+    if (texErr) throw new Error('Failed to fetch template exercises');
+
+    const grouped: Record<string, TemplateExercise[]> = {};
+    for (const row of tex || []) {
+        const item = mapTemplateExerciseRow(row);
+        (grouped[row.template_id] ||= []).push(item);
+    }
+
+    return (templates || []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        created_at: t.created_at,
+        exercises: grouped[t.id] || [],
+    }));
+};
+
 export const api = {
     // Profiles
     async upsertProfile(username: string) {
@@ -99,24 +133,6 @@ export const api = {
     },
 
     // Templates
-    async listTemplates(): Promise<WorkoutTemplate[]> {
-        const { data: templates, error } = await supabase.from('templates').select('*').order('created_at', { ascending: false })
-        if (error) throw error
-        const ids = (templates || []).map((t) => t.id)
-        if (ids.length === 0) return []
-        const { data: tex, error: texErr } = await supabase
-            .from('template_exercises')
-            .select('*')
-            .in('template_id', ids)
-            .order('position', { ascending: true })
-        if (texErr) throw texErr
-        const grouped: Record<string, TemplateExercise[]> = {}
-        for (const row of tex || []) {
-            const item = mapTemplateExerciseRow(row)
-                ; (grouped[row.template_id] ||= []).push(item)
-        }
-        return (templates || []).map((t) => ({ id: t.id, name: t.name, exercises: grouped[t.id] || [] }))
-    },
     async getTemplate(id: string): Promise<WorkoutTemplate | null> {
         const { data: t, error } = await supabase.from('templates').select('*').eq('id', id).single()
         if (error) return null
@@ -126,12 +142,19 @@ export const api = {
             .eq('template_id', id)
             .order('position', { ascending: true })
         if (texErr) throw texErr
-        return { id: t.id, name: t.name, exercises: (tex || []).map(mapTemplateExerciseRow) }
+        return { id: t.id, name: t.name, created_at: t.created_at, exercises: (tex || []).map(mapTemplateExerciseRow) }
     },
     async createTemplate(name: string): Promise<WorkoutTemplate> {
-        const { data, error } = await supabase.from('templates').insert({ name }).select('*').single()
+        const { data: user } = await supabase.auth.getUser();
+        if (!user?.user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('templates')
+            .insert({ name, user_id: user.user.id })
+            .select('*')
+            .single()
         if (error) throw error
-        return { id: data.id, name: data.name, exercises: [] }
+        return { id: data.id, name: data.name, created_at: data.created_at, exercises: [] }
     },
     async createTemplateWithExercises(name: string, exercises: TemplateExercise[]) {
         const t = await api.createTemplate(name)

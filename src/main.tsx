@@ -81,7 +81,7 @@ createRoot(document.getElementById('root')!).render(
                   }
                 />
                 <Route
-                  path="templates/:id"
+                  path="templates/editor/:id"
                   element={
                     <RequireAuth>
                       <Suspense fallback={null}><TemplateEditorPage /></Suspense>

@@ -57,7 +57,7 @@ export default function TemplatesPage() {
   const load = async () => {
     try {
       setLoading(true)
-      const data = await api.listTemplates()
+      const data = await api.fetchWorkoutTemplates()
       setTemplates(data)
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao carregar templates')
