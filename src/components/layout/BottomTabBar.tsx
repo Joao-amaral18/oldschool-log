@@ -1,42 +1,33 @@
-import { Link, useLocation } from 'react-router-dom'
-import { Dumbbell, FileText, History } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import {
+    Home,
+    Dumbbell,
+    LayoutGrid,
+    BarChart2,
+    History,
+    Settings,
+} from 'lucide-react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useScrollDirection } from '@/hooks/useScrollDirection'
-import { Card } from '@/components/ui/card'
 
 const tabs = [
-    {
-        id: 'treino',
-        label: 'Treino',
-        icon: Dumbbell,
-        path: '/treino'
-    },
-    {
-        id: 'templates',
-        label: 'Templates',
-        icon: FileText,
-        path: '/templates'
-    },
-    {
-        id: 'history',
-        label: 'Histórico',
-        icon: History,
-        path: '/history'
-    }
+    { path: '/treino', label: 'Treino', icon: Dumbbell },
+    { path: '/templates', label: 'Templates', icon: LayoutGrid },
+    { path: '/history', label: 'Histórico', icon: History },
+    { path: '/analytics', label: 'Analytics', icon: BarChart2 },
 ]
 
 export function BottomTabBar() {
     const location = useLocation()
-    const { isVisible } = useScrollDirection()
+    const { scrollDirection } = useScrollDirection()
 
-    // Hide navbar in session page
-    const isSessionPage = location.pathname.startsWith('/session/')
+    const isSessionPage = location.pathname.includes('/session/')
 
     // Find active tab index for pill animation
     const activeTabIndex = tabs.findIndex(tab =>
         location.pathname === tab.path ||
         (tab.path === '/treino' && location.pathname === '/') ||
-        (tab.path === '/templates' && location.pathname.startsWith('/templates'))
+        (tab.path === '/templates' && location.pathname.startsWith('/templates')) ||
+        (tab.path === '/history' && location.pathname.startsWith('/history'))
     )
 
     if (isSessionPage) {
@@ -45,56 +36,35 @@ export function BottomTabBar() {
 
     return (
         <nav
-            className={cn(
-                'fixed bottom-4 left-4 right-4 z-50 md:hidden liquid-float-3 transition-[transform,opacity] duration-300 ease-out will-change-transform',
-                isVisible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-6 opacity-0 scale-95'
-            )}
+            className={`fixed bottom-0 left-0 right-0 z-10 bg-card/80 backdrop-blur-lg border-t border-border/60 transition-transform duration-300 ${scrollDirection === 'down' ? 'translate-y-full' : 'translate-y-0'
+                }`}
         >
-            <Card className="liquid-navbar px-2 py-2">
-                <div className="flex relative">
-                    {/* Animated pill background */}
-                    <div
-                        className="absolute top-2 bottom-2 liquid-pill transition-all duration-300 ease-out"
-                        style={{
-                            width: `calc(33.333% - 8px)`,
-                            left: `calc(${activeTabIndex * 33.333}% + 4px)`,
-                            opacity: activeTabIndex >= 0 ? 1 : 0
-                        }}
-                    />
+            <div className="relative flex justify-around items-center h-16">
+                {/* Pill for active tab */}
+                <div
+                    className="absolute top-1/2 -translate-y-1/2 left-0 h-12 w-[25%] bg-primary/10 rounded-full transition-transform duration-300 ease-in-out"
+                    style={{
+                        transform: `translateX(${activeTabIndex * 100}%) translateY(-50%)`,
+                    }}
+                />
 
-                    {tabs.map((tab, index) => {
-                        const Icon = tab.icon
-                        const isActive = index === activeTabIndex
-
-                        return (
-                            <Link
-                                key={tab.id}
-                                to={tab.path}
-                                className="flex-1 flex flex-col items-center justify-center py-3 px-2 min-h-[56px] relative z-10 transition-all duration-300"
-                            >
-                                <Icon
-                                    className={cn(
-                                        'h-5 w-5 mb-1 transition-all duration-300',
-                                        isActive
-                                            ? 'text-primary-foreground scale-110'
-                                            : 'text-muted-foreground hover:text-foreground hover:scale-105'
-                                    )}
-                                />
-                                <span
-                                    className={cn(
-                                        'text-xs font-medium transition-all duration-300',
-                                        isActive
-                                            ? 'text-primary-foreground font-semibold'
-                                            : 'text-muted-foreground'
-                                    )}
-                                >
-                                    {tab.label}
-                                </span>
-                            </Link>
-                        )
-                    })}
-                </div>
-            </Card>
+                {tabs.map((tab, index) => (
+                    <NavLink
+                        key={tab.path}
+                        to={tab.path}
+                        className={({ isActive }) =>
+                            `relative z-20 flex-1 flex flex-col items-center justify-center text-center transition-colors duration-200 ${isActive ? 'text-primary' : 'text-muted-foreground'
+                            }`
+                        }
+                    >
+                        <tab.icon
+                            className="w-6 h-6 mb-1"
+                            aria-hidden="true"
+                        />
+                        <span className="text-xs font-medium">{tab.label}</span>
+                    </NavLink>
+                ))}
+            </div>
         </nav>
     )
 }
