@@ -1,5 +1,5 @@
 import { supabase, type Tables } from '@/lib/supabase'
-import type { Exercise, TemplateExercise, WorkoutTemplate, WorkoutHistory } from '@/types'
+import type { Exercise, TemplateExercise, WorkoutTemplate } from '@/types'
 
 function mapExerciseRow(row: Tables['exercises']['Row']): Exercise {
     return { id: row.id, name: row.name, muscleGroup: row.muscle_group as Exercise['muscleGroup'] }

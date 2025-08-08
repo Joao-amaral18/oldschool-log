@@ -1,4 +1,4 @@
-import { Skeleton, SkeletonCard, SkeletonList } from '@/components/ui/skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // Skeleton for template list page
 export function TemplateListSkeleton() {

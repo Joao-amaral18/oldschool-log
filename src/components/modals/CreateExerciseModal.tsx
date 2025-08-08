@@ -33,8 +33,12 @@ export function CreateExerciseModal({ open, onClose, title, description, onConfi
   const handleConfirm = () => {
     const trimmed = name.trim()
     if (!trimmed) return
-    onConfirm({ name: trimmed, muscleGroup: group })
-    onClose()
+    try {
+      onConfirm({ name: trimmed, muscleGroup: group })
+      onClose()
+    } catch {
+      // fallback: keep modal open for user correction
+    }
   }
 
   return (
