@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Dumbbell } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { api } from '@/lib/api'
 import { TemplateEditorSkeleton } from '@/components/skeletons'
 
@@ -207,7 +208,8 @@ export default function TemplateEditorPage() {
   return (
     <div className="space-y-4">
       {/* Sticky sub-header */}
-      <div className="sticky top-2 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 border rounded-xl p-3 flex items-center justify-between gap-3 surface">
+      <div className="sticky top-2 z-10 surface relative overflow-hidden p-3 flex items-center justify-between gap-3">
+        <div className="pointer-events-none absolute -top-20 -right-20 h-40 w-40 rounded-full bg-gradient-to-br from-zinc-600/15 to-zinc-300/10 blur-3xl" />
         <Input className="max-w-md text-lg font-semibold" value={template.name} onChange={(e) => setName(e.target.value)} />
         <div className="flex items-center gap-2">
           <Button
@@ -227,10 +229,21 @@ export default function TemplateEditorPage() {
       </div>
 
       <div className="grid gap-3">
+        {template.exercises.length === 0 && (
+          <div className="surface p-8 text-center text-muted-foreground rounded-xl">
+            <Dumbbell className="h-10 w-10 mx-auto opacity-60 mb-2" />
+            <div className="font-medium">Nenhum exercício adicionado ainda</div>
+            <div className="text-sm">Use o botão abaixo para adicionar seu primeiro exercício</div>
+          </div>
+        )}
         {template.exercises.map((te, idx) => (
-          <Card key={te.id}>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
+          <motion.div key={te.id} whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
+            <Card className="surface overflow-hidden transition-colors duration-200 hover:border-zinc-500 hover:bg-accent/60">
+              <CardContent className="space-y-3 p-4 md:p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 rounded-md border border-stone-800 px-2 py-0.5"><Dumbbell className="h-3.5 w-3.5" /> Exercício</span>
+                  </div>
                 <Button
                   variant="outline"
                   onClick={async () => {
@@ -327,8 +340,9 @@ export default function TemplateEditorPage() {
                   ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
         <div className="flex">
           <Button onClick={addExerciseViaPicker} className="flex-1" variant="outline">

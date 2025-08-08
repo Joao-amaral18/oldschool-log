@@ -59,6 +59,15 @@ export default function SettingsPage() {
 
   const deleteExercise = async (id: string) => {
     try {
+      const ex = exercises.find((e) => e.id === id)
+      const confirmed = await modalApi.confirm({
+        title: 'Excluir exercício',
+        description: `Tem certeza que deseja excluir "${ex?.name ?? 'Exercício'}"? Esta ação não pode ser desfeita.`,
+        confirmText: 'Excluir',
+        cancelText: 'Cancelar',
+        variant: 'destructive',
+      })
+      if (!confirmed) return
       await api.deleteExercise(id)
       setExercises((prev) => prev.filter((e) => e.id !== id))
       toast.success('Exercício excluído')

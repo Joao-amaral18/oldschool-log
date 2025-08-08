@@ -21,16 +21,27 @@ import { RequireAuth } from '@/components/guards/RequireAuth'
 import { ModalProvider } from '@/context/ModalContext'
 import { Toaster } from 'sonner'
 
-if ('serviceWorker' in navigator) {
+// Register SW only in production to avoid interfering with Vite dev/HMR
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((reg) => {
-      navigator.serviceWorker.addEventListener('message', async (event) => {
-        if (event.data?.type === 'SYNC_SETS') {
-          // Defer to session page listeners if needed
-        }
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        navigator.serviceWorker.addEventListener('message', async (event) => {
+          if (event.data?.type === 'SYNC_SETS') {
+            // Defer to session page listeners if needed
+          }
+        })
+        return reg
       })
-      return reg
-    }).catch(() => { })
+      .catch(() => { })
+  })
+}
+
+// In development, proactively unregister any existing SW from previous sessions
+if (!import.meta.env.PROD && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((r) => r.unregister())
   })
 }
 

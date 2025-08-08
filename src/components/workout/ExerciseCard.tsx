@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, ChevronDown, ChevronUp, Play, Check } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -125,7 +125,7 @@ export function ExerciseCard({
                             {isCompleted ? (
                                 <Check className="h-5 w-5 text-primary" />
                             ) : isExpanded ? (
-                                <Play className="h-5 w-5 text-primary" />
+                                <Dumbbell className="h-5 w-5 text-primary" />
                             ) : (
                                 <div className="h-5 w-5 rounded-full border-2 border-muted-foreground" />
                             )}
