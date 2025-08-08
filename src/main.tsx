@@ -29,8 +29,13 @@ import { queryClient } from '@/lib/queryClient'
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/sw.js')
+      .register('/sw.js', { scope: '/' })
       .then((reg) => {
+        // Try to trigger skipWaiting -> claim for updates
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          // noop
+        })
         navigator.serviceWorker.addEventListener('message', async (event) => {
           if (event.data?.type === 'SYNC_SETS') {
             // Defer to session page listeners if needed
