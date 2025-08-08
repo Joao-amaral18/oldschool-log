@@ -5,15 +5,19 @@ import { useAuth } from '@/context/AuthContext'
 import { useModal } from '@/hooks/useModal'
 import type { PerformedSet, WorkoutTemplate, TemplateExercise, Exercise } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+// import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { formatSeconds } from '@/lib/utils'
 import { toast } from 'sonner'
-import { X, Clock, Plus } from 'lucide-react'
-import { ExerciseCard } from '@/components/workout/ExerciseCard'
+import { X, Plus, ChevronDown, Timer, Circle, CheckCircle2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { enqueueSet, registerSync } from '@/lib/offlineQueue'
 import { SessionSkeleton } from '@/components/skeletons'
+
+type LocalSet = { id: number; reps: string; load: string; isCompleted: boolean }
+type ExerciseLocalState = { sets: LocalSet[]; isCompleted: boolean }
 
 export default function SessionPage() {
   const { templateId } = useParams<{ templateId: string }>()
@@ -26,6 +30,8 @@ export default function SessionPage() {
   const [elapsed, setElapsed] = useState(0)
   const [expandedExerciseIndex, setExpandedExerciseIndex] = useState(0)
   const [completedExercises, setCompletedExercises] = useState<Set<number>>(new Set())
+  const [exerciseStates, setExerciseStates] = useState<Record<string, ExerciseLocalState>>({})
+  const exerciseRefs = useRef<Array<HTMLDivElement | null>>([])
   const timerRef = useRef<number | null>(null)
   const startedAtRef = useRef<number>(Date.now())
   const workoutIdRef = useRef<string>('')
@@ -74,8 +80,36 @@ export default function SessionPage() {
         performedExerciseIdsRef.current = tpl.exercises.map((te) => started.performedMapByTemplateExerciseId[te.id])
         setPerformedSetsState(tpl.exercises.map(() => []))
 
-        // Start timer
-        timerRef.current = window.setInterval(() => setElapsed((v) => v + 1), 1000)
+        // Initialize local UI state for rows per exercise
+        const init: Record<string, ExerciseLocalState> = {}
+        for (const te of tpl.exercises) {
+          const count = Math.max(1, te.sets || 1)
+          init[te.id] = {
+            isCompleted: false,
+            sets: Array.from({ length: count }, (_, i) => ({
+              id: i + 1,
+              reps: te.reps ? String(te.reps) : '',
+              load: te.load ? String(te.load) : '',
+              isCompleted: false,
+            })),
+          }
+        }
+        // Restore draft if present
+        try {
+          const key = `session-draft:${workoutIdRef.current}`
+          const raw = localStorage.getItem(key)
+          if (raw) {
+            const saved = JSON.parse(raw) as Record<string, ExerciseLocalState>
+            setExerciseStates(saved)
+          } else {
+            setExerciseStates(init)
+          }
+        } catch {
+          setExerciseStates(init)
+        }
+        exerciseRefs.current = Array.from({ length: tpl.exercises.length }, () => null)
+
+        // Timer will be started in a separate effect once template is ready
       } catch (e: any) {
         toast.error(e?.message || 'Erro ao iniciar sessão')
         navigate('/treino')
@@ -90,13 +124,46 @@ export default function SessionPage() {
     }
   }, [session, templateId])
 
+  // Start/update timer when template is ready. Compute elapsed based on startedAtRef to avoid double increments
+  useEffect(() => {
+    if (!template) return
+    // Clear any stray interval
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    // Sync immediately
+    setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000))
+    const id = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000))
+    }, 1000)
+    timerRef.current = id as unknown as number
+    return () => {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current)
+        timerRef.current = null
+      } else {
+        window.clearInterval(id)
+      }
+    }
+  }, [template?.id])
+
+  // Persist drafts per workout (must come before any conditional return)
+  useEffect(() => {
+    const key = `session-draft:${workoutIdRef.current}`
+    try {
+      if (workoutIdRef.current) localStorage.setItem(key, JSON.stringify(exerciseStates))
+    } catch { }
+  }, [exerciseStates])
+
   if (!template) {
     return <SessionSkeleton />
   }
 
-  const totalSets = template.exercises.reduce((acc, e) => acc + e.sets, 0)
-  const completedSets = performedSetsState.reduce((acc, arr) => acc + arr.length, 0)
-  const progressValue = totalSets > 0 ? (completedSets / totalSets) * 100 : 0
+  // Progress based on local row completion
+  const totalSetsPlanned = template.exercises.reduce((acc, te) => acc + (exerciseStates[te.id]?.sets.length ?? te.sets), 0)
+  const completedSetsCount = template.exercises.reduce((acc, te) => acc + (exerciseStates[te.id]?.sets.filter((s) => s.isCompleted).length ?? 0), 0)
+  const progressValue = totalSetsPlanned > 0 ? (completedSetsCount / totalSetsPlanned) * 100 : 0
 
   const handleSetComplete = async (
     exerciseIndex: number,
@@ -131,15 +198,69 @@ export default function SessionPage() {
     }
   }
 
-  const handleExerciseComplete = (exerciseIndex: number) => {
-    setCompletedExercises((prev) => new Set(prev).add(exerciseIndex))
-    // Find next uncompleted exercise
-    const nextExerciseIndex = template.exercises.findIndex((_, idx) => idx > exerciseIndex && !completedExercises.has(idx))
-    if (nextExerciseIndex !== -1) setExpandedExerciseIndex(nextExerciseIndex)
-  }
+  // kept for compatibility with previous UI (currently unused)
+  // const handleExerciseComplete = (_exerciseIndex: number) => {}
 
   const handleExerciseToggle = (exerciseIndex: number) => {
     if (!completedExercises.has(exerciseIndex)) setExpandedExerciseIndex(exerciseIndex)
+  }
+
+  const handleSetUpdate = (exerciseId: string, setId: number, field: 'reps' | 'load', value: string) => {
+    setExerciseStates((prev) => {
+      const next = { ...prev }
+      const st = { ...(next[exerciseId] ?? { sets: [], isCompleted: false }) }
+      st.sets = st.sets.map((s) => (s.id === setId ? { ...s, [field]: value } : s))
+      next[exerciseId] = st
+      return next
+    })
+  }
+
+  const handleSetToggleComplete = (exerciseId: string, setId: number) => {
+    let justCompleted = false
+    setExerciseStates((prev) => {
+      const next = { ...prev }
+      const st = { ...(next[exerciseId] ?? { sets: [], isCompleted: false }) }
+      st.sets = st.sets.map((s) => {
+        if (s.id !== setId) return s
+        const newCompleted = !s.isCompleted
+        if (newCompleted && !s.isCompleted) justCompleted = true
+        return { ...s, isCompleted: newCompleted }
+      })
+      st.isCompleted = st.sets.length > 0 && st.sets.every((s) => s.isCompleted)
+      next[exerciseId] = st
+      return next
+    })
+    // If toggled to completed, send performed set to backend using current values
+    if (justCompleted) {
+      const teIndex = template.exercises.findIndex((te) => te.id === exerciseId)
+      if (teIndex !== -1) {
+        const row = exerciseStates[exerciseId]?.sets.find((s) => s.id === setId)
+        const parsedLoad = row?.load ? Number(row.load) : 0
+        const parsedReps = row?.reps ? Number(row.reps) : 0
+        if (parsedLoad > 0 && parsedReps > 0) {
+          void handleSetComplete(teIndex, { load: parsedLoad, reps: parsedReps, kind: 'working' })
+        }
+      }
+    }
+  }
+
+  const handleAddSet = (exerciseId: string) => {
+    setExerciseStates((prev) => {
+      const next = { ...prev }
+      const st = { ...(next[exerciseId] ?? { sets: [], isCompleted: false }) }
+      const nextId = st.sets.length > 0 ? Math.max(...st.sets.map((s) => s.id)) + 1 : 1
+      const last = st.sets[st.sets.length - 1]
+      st.sets = [...st.sets, { id: nextId, reps: last?.reps ?? '', load: last?.load ?? '', isCompleted: false }]
+      st.isCompleted = false
+      next[exerciseId] = st
+      return next
+    })
+    const idx = template.exercises.findIndex((te) => te.id === exerciseId)
+    setCompletedExercises((prev) => {
+      const next = new Set(prev)
+      if (idx !== -1) next.delete(idx)
+      return next
+    })
   }
 
   const handleCloseSession = async () => {
@@ -244,79 +365,111 @@ export default function SessionPage() {
     }
   }
 
-  const allExercisesCompleted = template.exercises.every((_, idx) => completedExercises.has(idx))
+  // computed but not used; keep if needed for future UI
+  // const allExercisesCompleted = template.exercises.every((te) => exerciseStates[te.id]?.isCompleted)
+  const completedExercisesCount = template.exercises.filter((te) => exerciseStates[te.id]?.isCompleted).length
+  const currentExerciseId = template.exercises[expandedExerciseIndex]?.id
+  const allSetsForCurrentExerciseCompleted = currentExerciseId ? (exerciseStates[currentExerciseId]?.sets.every((s) => s.isCompleted) ?? false) : false
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6 pb-8">
-      {/* Header com botão fechar */}
-      <div className="flex items-center justify-between sticky top-14 md:top-[73px] bg-background/95 backdrop-blur-md z-30 py-4 border-b">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={handleCloseSession}>
-            <X className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="font-semibold">{template.name}</h1>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              {formatSeconds(elapsed)}
-            </div>
-          </div>
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col min-h-screen">
+      {/* Header */}
+      <div className="flex items-center justify-between sticky top-14 md:top-[73px] bg-background/95 backdrop-blur-md z-30 py-4 border-b px-4">
+        <Button variant="ghost" size="icon" onClick={handleCloseSession}><X className="h-5 w-5" /></Button>
+        <div className="text-center">
+          <p className="font-semibold">{template.name}</p>
+        </div>
+        <div className="w-24 text-right flex items-center justify-end gap-2">
+          <Timer className="w-4 h-4" />
+          <span className="font-mono">{formatSeconds(elapsed)}</span>
         </div>
       </div>
 
-      {/* Progress Overview */}
-      <Card className="surface">
-        <CardContent className="p-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Progresso Geral</span>
-              <span className="text-sm text-muted-foreground">{completedSets}/{totalSets} séries</span>
-            </div>
-            <Progress value={progressValue} className="h-2" />
-            <div className="text-xs text-muted-foreground">
-              {completedExercises.size}/{template.exercises.length} exercícios concluídos
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Progress */}
+      <div className="p-4">
+        <Progress value={progressValue} className="w-full h-2" />
+        <p className="text-center text-sm text-muted-foreground mt-2">{completedExercisesCount} de {template.exercises.length} exercícios concluídos</p>
+      </div>
 
-      {/* Exercise List */}
-      <div className="space-y-4">
-        {template.exercises.map((templateExercise, index) => {
-          const exercise = exercises.find((e) => e.id === templateExercise.exerciseId)
+      {/* Exercise Blocks */}
+      <main className="flex-grow flex flex-col px-4 pb-24 space-y-3">
+        {template.exercises.map((te, idx) => {
+          const exercise = exercises.find((e) => e.id === te.exerciseId)
           if (!exercise) return null
-          const performedSets = performedSetsState[index] || []
+          const st = exerciseStates[te.id]
+          const isExpanded = idx === expandedExerciseIndex
+          const isCompleted = !!st?.isCompleted
+          const seriesDisp = `${Math.max(1, te.sets || 1)} séries${te.reps ? ` x ${te.reps} reps` : ''}`
+          const restDisp = te.restSec ? `${te.restSec}s descanso` : null
           return (
-            <ExerciseCard
-              key={templateExercise.id}
-              templateExercise={templateExercise}
-              exercise={exercise}
-              performedSets={performedSets}
-              isExpanded={expandedExerciseIndex === index}
-              isCompleted={completedExercises.has(index)}
-              onSetComplete={(setData) => handleSetComplete(index, setData)}
-              onExerciseComplete={() => handleExerciseComplete(index)}
-              onToggleExpand={() => handleExerciseToggle(index)}
-            />
+            <div key={te.id} ref={(el) => { exerciseRefs.current[idx] = el }}>
+              <button
+                type="button"
+                onClick={() => handleExerciseToggle(idx)}
+                className={cn('flex w-full items-center gap-4 p-4 rounded-lg border bg-card transition-colors', isExpanded ? 'border-primary' : 'border-stone-800 hover:border-zinc-500')}
+              >
+                <div className="flex items-center gap-4 flex-grow text-left">
+                  {isCompleted ? (<CheckCircle2 className="w-5 h-5 text-primary" />) : (<Circle className="w-5 h-5 text-muted-foreground" />)}
+                  <div>
+                    <p className="font-semibold text-foreground">{exercise.name}</p>
+                    <p className="text-xs text-muted-foreground">{seriesDisp} {restDisp && `• ${restDisp}`}</p>
+                  </div>
+                </div>
+                <ChevronDown className={cn('h-5 w-5 text-muted-foreground transition-transform', isExpanded && 'rotate-180')} />
+              </button>
+
+              {isExpanded && (
+                <div className="bg-card border border-t-0 rounded-b-lg p-4 space-y-4">
+                  <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground px-2">
+                    <div className="col-span-2 text-center">Série</div>
+                    <div className="col-span-4 text-center">Carga (kg)</div>
+                    <div className="col-span-4 text-center">Reps</div>
+                    <div className="col-span-2"></div>
+                  </div>
+                  <div className="space-y-2">
+                    {st?.sets.map((s) => (
+                      <div key={s.id} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-2 text-center">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center font-bold text-foreground mx-auto">{s.id}</div>
+                        </div>
+                        <div className="col-span-4">
+                          <Input type="number" placeholder="-" value={s.load} onChange={(e) => handleSetUpdate(te.id, s.id, 'load', e.target.value)} className="bg-background border-input text-center text-base" />
+                        </div>
+                        <div className="col-span-4">
+                          <Input type="number" placeholder="-" value={s.reps} onChange={(e) => handleSetUpdate(te.id, s.id, 'reps', e.target.value)} className="bg-background border-input text-center text-base" />
+                        </div>
+                        <div className="col-span-2 flex justify-center">
+                          <input type="checkbox" checked={s.isCompleted} onChange={() => handleSetToggleComplete(te.id, s.id)} className="h-5 w-5 rounded border-stone-800" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => handleAddSet(te.id)}>
+                    <Plus className="h-4 w-4 mr-2" /> Adicionar Set
+                  </Button>
+                </div>
+              )}
+            </div>
           )
         })}
-      </div>
 
-      {/* Action Buttons */}
-      <div className="space-y-3">
         <Button variant="outline" className="w-full" onClick={addNewExerciseToSession}>
-          <Plus className="mr-2 h-4 w-4" />
-          Adicionar Exercício
+          <Plus className="mr-2 h-4 w-4" /> Adicionar Exercício
         </Button>
+      </main>
 
-        {allExercisesCompleted && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-            <Button className="w-full h-12 glow" onClick={handleFinishWorkout}>
-              Finalizar Treino
-            </Button>
-          </motion.div>
-        )}
-      </div>
+      {allSetsForCurrentExerciseCompleted && (
+        <div className="p-4 w-full max-w-2xl mx-auto fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t">
+          <Button onClick={() => {
+            const currentIdx = expandedExerciseIndex
+            const nextIdx = template.exercises.findIndex((_, idx) => idx > currentIdx && !(exerciseStates[template.exercises[idx].id]?.isCompleted))
+            if (nextIdx !== -1) setExpandedExerciseIndex(nextIdx)
+            else void handleFinishWorkout()
+          }} className="w-full h-14 text-lg">
+            {expandedExerciseIndex < template.exercises.length - 1 ? 'Próximo Exercício' : 'Finalizar Treino'}
+          </Button>
+        </div>
+      )}
     </motion.div>
   )
 }

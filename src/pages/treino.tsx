@@ -3,12 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import type { WorkoutTemplate } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Settings, Plus, Search, Dumbbell, Clock } from 'lucide-react'
+import { Plus, Dumbbell, Zap, Target, Pencil, List } from 'lucide-react'
 import { api } from '@/lib/api'
 // import { toast } from 'sonner'
 import { TreinoPageSkeleton } from '@/components/skeletons'
-import { Input } from '@/components/ui/input'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
@@ -18,8 +16,7 @@ export default function TreinoPage() {
     const navigate = useNavigate()
     const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
     const [loading, setLoading] = useState(true)
-    const [query, setQuery] = useState('')
-    const [sort, setSort] = useState<'recent' | 'name'>('recent')
+    const [query] = useState('')
 
     // legacy load function removed in favor of React Query
 
@@ -43,10 +40,9 @@ export default function TreinoPage() {
         let list = q
             ? templates.filter((t) => t.name.toLowerCase().includes(q))
             : templates.slice()
-        if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name))
         // recent already comes ordered by created_at desc from API
         return list
-    }, [templates, query, sort])
+    }, [templates, query])
 
     if (loading) {
         return <TreinoPageSkeleton />
@@ -54,33 +50,49 @@ export default function TreinoPage() {
 
     return (
         <div className="space-y-6">
-            {/* Hero / Controls */}
+            {/* Hero: Próximo treino */}
             <div className="surface relative overflow-hidden p-5">
                 <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-gradient-to-br from-zinc-600/20 to-zinc-300/10 blur-3xl" />
-                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                    <div className="space-y-1">
-                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Treino</h1>
-                        <p className="text-muted-foreground">Escolha um template para iniciar sua sessão</p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <div className="relative sm:w-72">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Buscar template..."
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                className="pl-10"
-                            />
+                <div className="space-y-3">
+                    <div className="text-sm text-muted-foreground">Seu próximo treino</div>
+                    {templates.length > 0 ? (
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+                                    {templates[0].name}
+                                </h2>
+                                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-stone-800 px-2 py-1">
+                                        <Dumbbell className="h-3.5 w-3.5" /> {templates[0].exercises.length} exercícios
+                                    </span>
+                                    {/* Tags opcionais (exibir se existir meta no template no futuro) */}
+                                    <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-stone-800 px-2 py-1">
+                                        <Zap className="h-3.5 w-3.5" /> advanced
+                                    </span>
+                                    <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-stone-800 px-2 py-1">
+                                        <Target className="h-3.5 w-3.5" /> hypertrophy
+                                    </span>
+                                </div>
+                            </div>
+                            <Link to={`/session/${templates[0].id}`}>
+                                <Button className="bg-emerald-600 hover:bg-emerald-500 text-white">
+                                    Iniciar Treino
+                                </Button>
+                            </Link>
                         </div>
-                        <select
-                            className="rounded-md border border-stone-800 px-3 py-2 text-sm"
-                            value={sort}
-                            onChange={(e) => setSort(e.target.value as 'recent' | 'name')}
-                        >
-                            <option value="recent">Mais recentes</option>
-                            <option value="name">A–Z</option>
-                        </select>
-                    </div>
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Nenhum template</h2>
+                                <div className="mt-2 text-sm text-muted-foreground">Crie um template para começar</div>
+                            </div>
+                            <Link to="/templates">
+                                <Button className="glow">
+                                    <Plus className="mr-2 h-4 w-4" /> Criar Template
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -105,65 +117,44 @@ export default function TreinoPage() {
                     </Link>
                 </div>
             ) : (
-                <div className="grid gap-4 md:grid-cols-2">
-                    {filtered.map((template) => {
-                        const totalSets = template.exercises.reduce((s, e) => s + (e.sets || 0), 0)
-                        return (
-                            <motion.div key={template.id} whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
-                                <Card className="surface overflow-hidden transition-colors duration-200 hover:border-zinc-500 hover:bg-accent/60">
-                                    <CardContent className="p-6">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="flex-1">
-                                                <h3 className="font-semibold text-lg mb-1">{template.name}</h3>
-                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                    <span className="inline-flex items-center gap-1 rounded-md border border-stone-800 px-2 py-0.5"><Dumbbell className="h-3.5 w-3.5" /> {template.exercises.length} exer.</span>
-                                                    <span className="inline-flex items-center gap-1 rounded-md border border-stone-800 px-2 py-0.5"><Clock className="h-3.5 w-3.5" /> {totalSets} séries</span>
-                                                </div>
+                <div className="space-y-3">
+                    <h2 className="text-lg font-semibold">Seus Templates</h2>
+                    <div className="grid gap-3">
+                        {filtered.map((template) => {
+                            const totalSets = template.exercises.reduce((s, e) => s + (e.sets || 0), 0)
+                            return (
+                                <motion.div key={template.id} whileHover={{ y: -1 }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(`/session/${template.id}`)}
+                                        className="surface w-full text-left p-4 flex items-center justify-between rounded-xl border transition-colors hover:border-zinc-500 hover:bg-accent/60"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-9 w-9 rounded-md bg-emerald-600/20 text-emerald-400 flex items-center justify-center">
+                                                <List className="h-4 w-4" />
                                             </div>
-                                            <div className="bg-primary/10 rounded-full p-2">
-                                                <Dumbbell className="h-5 w-5 text-primary" />
+                                            <div>
+                                                <div className="font-medium">{template.name}</div>
+                                                <div className="text-xs text-muted-foreground">{template.exercises.length} exercícios • {totalSets} séries</div>
                                             </div>
                                         </div>
-
-                                        <div className="space-y-2 mb-4">
-                                            {template.exercises.slice(0, 3).map((exercise) => (
-                                                <div key={exercise.id} className="text-xs text-muted-foreground">
-                                                    • {exercise.sets} séries × {exercise.reps} reps
-                                                </div>
-                                            ))}
-                                            {template.exercises.length > 3 && (
-                                                <div className="text-xs text-muted-foreground">
-                                                    + {template.exercises.length - 3} mais...
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                            <Link to={`/session/${template.id}`} className="flex-1">
-                                                <Button className="w-full glow">
-                                                    <Dumbbell className="mr-2 h-4 w-4" />
-                                                    Iniciar
-                                                </Button>
-                                            </Link>
-                                            <Link to={`/templates/${template.id}`}>
-                                                <Button variant="outline" size="icon">
-                                                    <Settings className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        )
-                    })}
+                                        <Link to={`/templates/${template.id}`} onClick={(e) => e.stopPropagation()}>
+                                            <Button variant="outline" size="icon" className="h-8 w-8">
+                                                <Pencil className="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                    </button>
+                                </motion.div>
+                            )
+                        })}
+                    </div>
                 </div>
             )}
 
             <div className="flex justify-center">
-                <Link to="/templates">
-                    <Button variant="outline">
-                        <Settings className="mr-2 h-4 w-4" />
-                        Gerenciar Templates
+                <Link to="/templates" className="w-full">
+                    <Button variant="outline" className="w-full">
+                        Ver todos os templates
                     </Button>
                 </Link>
             </div>

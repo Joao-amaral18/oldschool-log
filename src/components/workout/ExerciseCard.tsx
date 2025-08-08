@@ -17,6 +17,7 @@ interface ExerciseCardProps {
     onSetComplete: (setData: { load: number; reps: number; kind: 'warmup' | 'recognition' | 'working' }) => void
     onExerciseComplete: () => void
     onToggleExpand: () => void
+    draftKey?: string
 }
 
 export function ExerciseCard({
@@ -27,7 +28,8 @@ export function ExerciseCard({
     isCompleted,
     onSetComplete,
     onExerciseComplete,
-    onToggleExpand
+    onToggleExpand,
+    draftKey
 }: ExerciseCardProps) {
     const [activeLoad, setActiveLoad] = useState(templateExercise.load)
     const [activeReps, setActiveReps] = useState(templateExercise.reps)
@@ -73,6 +75,32 @@ export function ExerciseCard({
         }
     }, [isExpanded, isCompleted])
 
+    // Load draft from localStorage when draftKey changes
+    useEffect(() => {
+        if (!draftKey) return
+        try {
+            const raw = localStorage.getItem(draftKey)
+            if (raw) {
+                const saved = JSON.parse(raw) as { load?: number; reps?: number; kind?: 'warmup' | 'recognition' | 'working' }
+                if (typeof saved.load === 'number') setActiveLoad(saved.load)
+                if (typeof saved.reps === 'number') setActiveReps(saved.reps)
+                if (saved.kind === 'warmup' || saved.kind === 'recognition' || saved.kind === 'working') setActiveKind(saved.kind)
+            }
+        } catch { }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draftKey])
+
+    // Persist draft to localStorage on changes
+    useEffect(() => {
+        if (!draftKey) return
+        try {
+            localStorage.setItem(
+                draftKey,
+                JSON.stringify({ load: activeLoad, reps: activeReps, kind: activeKind })
+            )
+        } catch { }
+    }, [draftKey, activeLoad, activeReps, activeKind])
+
     const handleSetComplete = () => {
         if (!activeLoad || !activeReps || activeLoad <= 0 || activeReps <= 0) return
 
@@ -91,6 +119,15 @@ export function ExerciseCard({
         setActiveLoad(templateExercise.load)
         setActiveReps(templateExercise.reps)
         setActiveKind('working')
+        // Persist reset
+        if (draftKey) {
+            try {
+                localStorage.setItem(
+                    draftKey,
+                    JSON.stringify({ load: templateExercise.load, reps: templateExercise.reps, kind: 'working' })
+                )
+            } catch { }
+        }
     }
 
     const formatSeconds = (total: number) => {
