@@ -81,12 +81,12 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
                     </div>
                 </div>
                 <DialogFooter className="items-center gap-2 sm:justify-between">
-                    <Button variant="link" onClick={onClose}>Cancelar</Button>
+                    <Button type="button" variant="link" onClick={onClose}>Cancelar</Button>
                     <div className="flex gap-2">
                         {onCreateNew && (
-                            <Button variant="outline" onClick={async () => { await onCreateNew(); onClose() }}>+ Criar novo exercício</Button>
+                            <Button type="button" variant="outline" onClick={async () => { await onCreateNew(); onClose() }}>+ Criar novo exercício</Button>
                         )}
-                        <Button onClick={() => { if (selectedId) { onSelect(selectedId); onClose() } }} disabled={!selectedId}>Selecionar</Button>
+                        <Button type="button" onClick={() => { if (selectedId) { onSelect(selectedId); onClose() } }} disabled={!selectedId}>Selecionar</Button>
                     </div>
                 </DialogFooter>
             </DialogContent>
