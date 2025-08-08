@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Settings, Plus, Search, Dumbbell, Clock } from 'lucide-react'
 import { api } from '@/lib/api'
-import { toast } from 'sonner'
+// import { toast } from 'sonner'
 import { TreinoPageSkeleton } from '@/components/skeletons'
 import { Input } from '@/components/ui/input'
 import { motion } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 
 export default function TreinoPage() {
     const { session } = useAuth()
@@ -19,25 +21,22 @@ export default function TreinoPage() {
     const [query, setQuery] = useState('')
     const [sort, setSort] = useState<'recent' | 'name'>('recent')
 
-    const load = async () => {
-        try {
-            setLoading(true)
-            const data = await api.listTemplates()
-            setTemplates(data)
-        } catch (e: any) {
-            toast.error(e?.message || 'Erro ao carregar templates')
-        } finally {
-            setLoading(false)
-        }
-    }
+    // legacy load function removed in favor of React Query
+
+    const { data: qTemplates, isFetching } = useQuery({
+        queryKey: queryKeys.templates(),
+        queryFn: api.listTemplates,
+        enabled: !!session,
+    })
 
     useEffect(() => {
         if (!session) {
             navigate('/login')
             return
         }
-        load()
-    }, [session])
+        if (qTemplates) setTemplates(qTemplates)
+        setLoading(isFetching)
+    }, [session, qTemplates, isFetching])
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase()

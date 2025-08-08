@@ -4,22 +4,26 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import App from './App'
 
-import LoginPage from './pages/login'
-import TreinoPage from './pages/treino'
-import TemplatesPage from './pages/templates/list'
-import TemplateEditorPage from './pages/templates/editor'
-import SessionPage from './pages/session'
-import HistoryPage from './pages/history'
-import SettingsPage from './pages/settings'
-import PerformanceDashboardPage from './pages/analytics/Dashboard'
-import ExerciseProgressPage from './pages/analytics/ExerciseProgress'
-import VolumeAnalysisPage from './pages/analytics/VolumeAnalysis'
-import HabitsPage from './pages/analytics/Habits'
-import PRsPage from './pages/analytics/PRs'
+import { lazy, Suspense } from 'react'
+const LoginPage = lazy(() => import('./pages/login'))
+const TreinoPage = lazy(() => import('./pages/treino'))
+const TemplatesPage = lazy(() => import('./pages/templates/list'))
+const TemplateEditorPage = lazy(() => import('./pages/templates/editor'))
+const SessionPage = lazy(() => import('./pages/session'))
+const HistoryPage = lazy(() => import('./pages/history'))
+const SettingsPage = lazy(() => import('./pages/settings'))
+const PerformanceDashboardPage = lazy(() => import('./pages/analytics/Dashboard'))
+const ExerciseProgressPage = lazy(() => import('./pages/analytics/ExerciseProgress'))
+const VolumeAnalysisPage = lazy(() => import('./pages/analytics/VolumeAnalysis'))
+const HabitsPage = lazy(() => import('./pages/analytics/Habits'))
+const PRsPage = lazy(() => import('./pages/analytics/PRs'))
 import { AuthProvider } from '@/context/AuthContext'
 import { RequireAuth } from '@/components/guards/RequireAuth'
 import { ModalProvider } from '@/context/ModalContext'
 import { Toaster } from 'sonner'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from '@/lib/queryClient'
+// import { ErrorBoundary } from '@/components/guards/ErrorBoundary'
 
 // Register SW only in production to avoid interfering with Vite dev/HMR
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
@@ -47,106 +51,108 @@ if (!import.meta.env.PROD && 'serviceWorker' in navigator) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <ModalProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<App />}>
-              <Route index element={<Navigate to="/treino" replace />} />
-              <Route path="login" element={<LoginPage />} />
-              <Route
-                path="treino"
-                element={
-                  <RequireAuth>
-                    <TreinoPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="templates"
-                element={
-                  <RequireAuth>
-                    <TemplatesPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="templates/:id"
-                element={
-                  <RequireAuth>
-                    <TemplateEditorPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="session/:templateId"
-                element={
-                  <RequireAuth>
-                    <SessionPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="history"
-                element={
-                  <RequireAuth>
-                    <HistoryPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="analytics"
-                element={
-                  <RequireAuth>
-                    <PerformanceDashboardPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="analytics/exercise"
-                element={
-                  <RequireAuth>
-                    <ExerciseProgressPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="analytics/volume"
-                element={
-                  <RequireAuth>
-                    <VolumeAnalysisPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="analytics/habits"
-                element={
-                  <RequireAuth>
-                    <HabitsPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="analytics/prs"
-                element={
-                  <RequireAuth>
-                    <PRsPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="settings"
-                element={
-                  <RequireAuth>
-                    <SettingsPage />
-                  </RequireAuth>
-                }
-              />
-            </Route>
-          </Routes>
-          <Toaster richColors position="top-right" />
-        </BrowserRouter>
-      </ModalProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ModalProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<App />}>
+                <Route index element={<Navigate to="/treino" replace />} />
+                <Route path="login" element={<Suspense fallback={null}><LoginPage /></Suspense>} />
+                <Route
+                  path="treino"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><TreinoPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="templates"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><TemplatesPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="templates/:id"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><TemplateEditorPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="session/:templateId"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><SessionPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="history"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><HistoryPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="analytics"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><PerformanceDashboardPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="analytics/exercise"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><ExerciseProgressPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="analytics/volume"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><VolumeAnalysisPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="analytics/habits"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><HabitsPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="analytics/prs"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><PRsPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="settings"
+                  element={
+                    <RequireAuth>
+                      <Suspense fallback={null}><SettingsPage /></Suspense>
+                    </RequireAuth>
+                  }
+                />
+              </Route>
+            </Routes>
+            <Toaster richColors position="top-right" />
+          </BrowserRouter>
+        </ModalProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   </StrictMode>,
 )

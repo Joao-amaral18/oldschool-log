@@ -51,7 +51,7 @@ function App() {
 
       {/* Main Content */}
       <main className={cn(
-        "container-app py-6 md:pb-6",
+        "container-app pt-2 pb-24 md:py-6",
         location.pathname.startsWith('/session/') ? "pb-6" : "pb-24"
       )}>
         <Outlet />

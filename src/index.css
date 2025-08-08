@@ -56,6 +56,11 @@ body {
     @apply rounded-xl border-stone-800 border bg-card/50 backdrop-blur-sm shadow-lg ring-1 ring-white/5;
 }
 
+/* Ensure mobile modals and sticky headers account for mobile safe areas */
+.safe-padded {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Interactive elements */
 .interactive {
     @apply hover:scale-[1.02] active:scale-[0.98] transition-transform;
