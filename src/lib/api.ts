@@ -50,6 +50,8 @@ export const fetchWorkoutTemplates = async (userId: string): Promise<WorkoutTemp
     }));
 };
 
+
+
 export const api = {
     // Profiles
     async upsertProfile(username: string) {
@@ -400,5 +402,98 @@ export const api = {
             durationSec: h.duration_sec,
             totalSets: counts[h.id] || 0,
         }))
+    },
+
+    async importWorkoutTemplates(templates: WorkoutTemplate[]): Promise<WorkoutTemplate[]> {
+        const importedTemplates: WorkoutTemplate[] = []
+
+        for (const template of templates) {
+            try {
+                // Create exercises first (if they don't exist)
+                const exerciseIds: string[] = []
+                for (const exercise of template.exercises) {
+                    // For imported templates, we need to handle the exercise creation/linking
+                    // The template.exercises will have exerciseName and muscleGroup instead of exerciseId
+                    const exerciseData = exercise as any
+
+                    // Check if exercise exists, if not create it
+                    const { data: existingExercise } = await supabase
+                        .from('exercises')
+                        .select('id')
+                        .eq('name', exerciseData.exerciseName)
+                        .eq('muscle_group', exerciseData.muscleGroup)
+                        .single()
+
+                    let exerciseId: string
+                    if (existingExercise) {
+                        exerciseId = existingExercise.id
+                    } else {
+                        // Create new exercise
+                        const { data: newExercise, error: exerciseError } = await supabase
+                            .from('exercises')
+                            .insert({
+                                name: exerciseData.exerciseName,
+                                muscle_group: exerciseData.muscleGroup
+                            })
+                            .select('id')
+                            .single()
+
+                        if (exerciseError) throw exerciseError
+                        exerciseId = newExercise.id
+                    }
+
+                    exerciseIds.push(exerciseId)
+                }
+
+                // Create the template
+                const { data: newTemplate, error: templateError } = await supabase
+                    .from('templates')
+                    .insert({ name: template.name })
+                    .select('*')
+                    .single()
+
+                if (templateError) throw templateError
+
+                // Create template exercises
+                const templateExercises = template.exercises.map((exercise, idx) => ({
+                    template_id: newTemplate.id,
+                    exercise_id: exerciseIds[idx],
+                    position: idx,
+                    sets: exercise.sets,
+                    reps: exercise.reps,
+                    load: exercise.load,
+                    rest_sec: exercise.restSec,
+                }))
+
+                const { error: exercisesError } = await supabase
+                    .from('template_exercises')
+                    .insert(templateExercises)
+
+                if (exercisesError) throw exercisesError
+
+                // Create the complete template object
+                const completeTemplate: WorkoutTemplate = {
+                    id: newTemplate.id,
+                    name: newTemplate.name,
+                    created_at: newTemplate.created_at,
+                    exercises: template.exercises.map((exercise, idx) => ({
+                        id: '', // We'll generate a temp ID
+                        exerciseId: exerciseIds[idx],
+                        sets: exercise.sets,
+                        reps: exercise.reps,
+                        load: exercise.load,
+                        restSec: exercise.restSec,
+                    }))
+                }
+
+                importedTemplates.push(completeTemplate)
+
+            } catch (error) {
+                console.error(`Error importing template "${template.name}":`, error)
+                throw error
+            }
+        }
+
+        return importedTemplates
     },
 }

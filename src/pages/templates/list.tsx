@@ -4,13 +4,14 @@ import { useAuth } from '@/context/AuthContext'
 import type { WorkoutTemplate } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Pencil, Copy, Trash2, Search, Layers, Dumbbell, Clock, Plus } from 'lucide-react'
+import { Pencil, Copy, Trash2, Search, Layers, Dumbbell, Clock, Plus, Upload } from 'lucide-react'
 import { api, fetchWorkoutTemplates } from '@/lib/api'
 import { toast } from 'sonner'
 import { TemplateListSkeleton } from '@/components/skeletons'
 import { Input } from '@/components/ui/input'
 import { motion } from 'framer-motion'
 import { useModal } from '@/hooks/useModal'
+import ImportWorkoutModal from '@/components/modals/ImportWorkoutModal'
 
 export default function TemplatesPage() {
   const { session } = useAuth()
@@ -19,6 +20,7 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<'recent' | 'name'>('recent')
+  const [showImportModal, setShowImportModal] = useState(false)
   const modal = useModal()
 
   const load = async () => {
@@ -79,6 +81,16 @@ export default function TemplatesPage() {
     }
   }
 
+  const handleImportTemplates = async (importedTemplates: WorkoutTemplate[]) => {
+    try {
+      const newTemplates = await api.importWorkoutTemplates(importedTemplates)
+      setTemplates((prev) => [...newTemplates, ...prev])
+      toast.success(`${newTemplates.length} template(s) importado(s) com sucesso!`)
+    } catch (e: any) {
+      throw new Error(e?.message || 'Erro ao importar templates')
+    }
+  }
+
   const sortedTemplates = useMemo(() => {
     const filtered = templates.filter((t) =>
       t.name.toLowerCase().includes(query.toLowerCase())
@@ -100,9 +112,14 @@ export default function TemplatesPage() {
         <h1 className="text-3xl font-bold tracking-tight">
           Meus Templates
         </h1>
-        <Button onClick={createNew} className="w-full md:w-auto">
-          <Plus className="mr-2 h-4 w-4" /> Criar Novo Template
-        </Button>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Button variant="outline" onClick={() => setShowImportModal(true)} className="w-full md:w-auto">
+            <Upload className="mr-2 h-4 w-4" /> Importar JSON
+          </Button>
+          <Button onClick={createNew} className="w-full md:w-auto">
+            <Plus className="mr-2 h-4 w-4" /> Criar Novo Template
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
@@ -122,7 +139,7 @@ export default function TemplatesPage() {
             onChange={(e) =>
               setSort(e.target.value as 'recent' | 'name')
             }
-            className="h-10 w-full md:w-auto rounded-md border border-stone-700 border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className="h-10 w-full md:w-auto rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <option value="recent">Mais Recentes</option>
             <option value="name">Ordem Alfabética</option>
@@ -228,6 +245,13 @@ export default function TemplatesPage() {
               : 'Crie seu primeiro template para começar!'}
           </p>
         </div>
+      )}
+
+      {showImportModal && (
+        <ImportWorkoutModal
+          onClose={() => setShowImportModal(false)}
+          onImport={handleImportTemplates}
+        />
       )}
     </div>
   )
