@@ -9,10 +9,10 @@ function mapTemplateExerciseRow(row: Tables['template_exercises']['Row']): Templ
     return {
         id: row.id,
         exerciseId: row.exercise_id,
-        sets: row.sets,
-        reps: row.reps,
+        sets: row.sets || 1,
+        reps: row.reps || 10,
         load: Number(row.load) || 0,
-        restSec: row.rest_sec,
+        restSec: row.rest_sec || 60,
     }
 }
 
@@ -220,12 +220,29 @@ export const api = {
 
     // Workout flow
     async startWorkout(template: WorkoutTemplate) {
+        // Validate template exercises have valid exercise IDs
+        const invalidExercises = template.exercises.filter(te => !te.exerciseId || te.exerciseId === '')
+        if (invalidExercises.length > 0) {
+            // Try to get exercise names from the template data
+            const exerciseNames = invalidExercises.map((te, idx) => {
+                // Look for exercise name in the template exercise data (from import)
+                const exerciseData = te as any
+                if (exerciseData.exerciseName) {
+                    return exerciseData.exerciseName
+                }
+                // Fallback to position
+                return `Exercício ${idx + 1}`
+            }).join(', ')
+            throw new Error(`Não foi possível iniciar o treino. Os seguintes exercícios têm problemas: ${exerciseNames}. Recarregue a página e tente novamente.`)
+        }
+
         const { data: wh, error } = await supabase
             .from('workout_histories')
             .insert({ template_id: template.id })
             .select('*')
             .single()
         if (error) throw error
+
         // Pre-create performed_exercises for each template exercise
         const payload = template.exercises.map((te, idx) => ({
             workout_id: wh.id,
@@ -233,6 +250,7 @@ export const api = {
             template_exercise_id: te.id,
             position: idx,
         }))
+
         let mapping: Record<string, string> = {}
         if (payload.length > 0) {
             const { data: pes, error: peErr } = await supabase.from('performed_exercises').insert(payload).select('*')
@@ -404,8 +422,9 @@ export const api = {
         }))
     },
 
-    async importWorkoutTemplates(templates: WorkoutTemplate[]): Promise<WorkoutTemplate[]> {
+    async importWorkoutTemplates(templates: WorkoutTemplate[]): Promise<{ templates: WorkoutTemplate[], createdExercises: string[] }> {
         const importedTemplates: WorkoutTemplate[] = []
+        const createdExercises: string[] = []
 
         for (const template of templates) {
             try {
@@ -438,8 +457,14 @@ export const api = {
                             .select('id')
                             .single()
 
-                        if (exerciseError) throw exerciseError
+                        if (exerciseError) {
+                            console.error(`Error creating exercise "${exerciseData.exerciseName}":`, exerciseError)
+                            throw new Error(`Falha ao criar exercício "${exerciseData.exerciseName}": ${exerciseError.message}`)
+                        }
+
                         exerciseId = newExercise.id
+                        createdExercises.push(exerciseData.exerciseName)
+                        console.log(`Created new exercise: ${exerciseData.exerciseName} (${exerciseData.muscleGroup})`)
                     }
 
                     exerciseIds.push(exerciseId)
@@ -494,6 +519,6 @@ export const api = {
             }
         }
 
-        return importedTemplates
+        return { templates: importedTemplates, createdExercises }
     },
 }

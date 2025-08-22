@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
-import { cn } from '@/lib/utils'
+import { cn, toNumber, getRestTimeOptions, getShorterRest, getLongerRest } from '@/lib/utils'
 import type { TemplateExercise, Exercise, PerformedSet } from '@/types'
 
 interface ExerciseCardProps {
@@ -35,11 +35,12 @@ export function ExerciseCard({
     const [activeReps, setActiveReps] = useState(templateExercise.reps)
     const [activeKind, setActiveKind] = useState<'warmup' | 'recognition' | 'working'>('working')
     const [restRemaining, setRestRemaining] = useState(0)
+    const [showRestOptions, setShowRestOptions] = useState(false)
     const restTimerRef = useRef<number | null>(null)
     const cardRef = useRef<HTMLDivElement>(null)
 
     const completedSets = performedSets.length
-    const plannedSets = templateExercise.sets
+    const plannedSets = toNumber(templateExercise.sets)
     const progressValue = plannedSets > 0 ? (completedSets / plannedSets) * 100 : 0
     const allSetsCompleted = completedSets >= plannedSets
 
@@ -102,17 +103,28 @@ export function ExerciseCard({
     }, [draftKey, activeLoad, activeReps, activeKind])
 
     const handleSetComplete = () => {
-        if (!activeLoad || !activeReps || activeLoad <= 0 || activeReps <= 0) return
+        // Load is optional, reps are required
+        if (!activeReps || toNumber(activeReps) <= 0) return
+
+        // If load is provided, it must be >= 0
+        if (activeLoad !== undefined && activeLoad !== null && activeLoad < 0) return
 
         onSetComplete({
             load: activeLoad,
-            reps: activeReps,
+            reps: toNumber(activeReps),
             kind: activeKind
         })
 
         // Start rest timer if not the last set
         if (completedSets + 1 < plannedSets) {
-            setRestRemaining(templateExercise.restSec)
+            const restOptions = getRestTimeOptions(templateExercise.restSec)
+            if (restOptions.options.length > 1) {
+                // Multiple rest options available, show selection
+                setShowRestOptions(true)
+            } else {
+                // Single rest time, start timer directly
+                setRestRemaining(restOptions.min)
+            }
         }
 
         // Reset for next set
@@ -223,6 +235,41 @@ export function ExerciseCard({
                                         ))}
                                     </div>
 
+                                    {/* Rest Time Selection */}
+                                    {showRestOptions && (
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            className="rounded-md border border-stone-700 border-primary/20 bg-primary/5 p-3"
+                                        >
+                                            <div className="text-sm font-medium text-primary mb-2">Escolher tempo de descanso:</div>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setRestRemaining(getShorterRest(templateExercise.restSec))
+                                                        setShowRestOptions(false)
+                                                    }}
+                                                    className="flex-1"
+                                                >
+                                                    {formatSeconds(getShorterRest(templateExercise.restSec))} (Curto)
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setRestRemaining(getLongerRest(templateExercise.restSec))
+                                                        setShowRestOptions(false)
+                                                    }}
+                                                    className="flex-1"
+                                                >
+                                                    {formatSeconds(getLongerRest(templateExercise.restSec))} (Longo)
+                                                </Button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+
                                     {/* Rest Timer */}
                                     {restRemaining > 0 && (
                                         <motion.div
@@ -276,7 +323,7 @@ export function ExerciseCard({
                                             <Button
                                                 onClick={handleSetComplete}
                                                 className="w-full h-12"
-                                                disabled={!activeLoad || !activeReps || activeLoad <= 0 || activeReps <= 0}
+                                                disabled={!activeReps || toNumber(activeReps) <= 0 || (activeLoad !== undefined && activeLoad !== null && activeLoad < 0)}
                                             >
                                                 <CheckCircle2 className="mr-2 h-4 w-4" />
                                                 Concluir Set {completedSets + 1}

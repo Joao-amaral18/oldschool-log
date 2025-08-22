@@ -54,19 +54,22 @@ export default function LoginPage() {
                                 htmlFor="email"
                                 className="text-sm font-medium flex items-center gap-2"
                             >
-                                <Mail className="w-4 h-4 login-icon" />
+                                <Mail className="w-4 h-4 text-muted-foreground" />
                                 Email
                             </label>
-                            <Input
-                                id="email"
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                                placeholder="seu@email.com"
-                                className="login-input h-12"
-                                disabled={isLoading}
-                            />
+                            <div className="relative">
+                                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                    placeholder="seu@email.com"
+                                    className="pl-12 h-12"
+                                    disabled={isLoading}
+                                />
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -74,19 +77,22 @@ export default function LoginPage() {
                                 htmlFor="password"
                                 className="text-sm font-medium flex items-center gap-2"
                             >
-                                <Lock className="w-4 h-4 login-icon" />
+                                <Lock className="w-4 h-4 text-muted-foreground" />
                                 Senha
                             </label>
-                            <Input
-                                id="password"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                placeholder="••••••••"
-                                className="login-input h-12"
-                                disabled={isLoading}
-                            />
+                            <div className="relative">
+                                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                                <Input
+                                    id="password"
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    placeholder="••••••••"
+                                    className="pl-12 h-12"
+                                    disabled={isLoading}
+                                />
+                            </div>
                         </div>
 
                         <Button

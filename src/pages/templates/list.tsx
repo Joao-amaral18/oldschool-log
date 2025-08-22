@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Pencil, Copy, Trash2, Search, Layers, Dumbbell, Clock, Plus, Upload, Play, Heart, Star, Filter } from 'lucide-react'
 import { api, fetchWorkoutTemplates } from '@/lib/api'
+import { toNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 import { TemplateListSkeleton } from '@/components/skeletons'
 import { Input } from '@/components/ui/input'
@@ -95,9 +96,21 @@ export default function TemplatesPage() {
 
   const handleImportTemplates = async (importedTemplates: WorkoutTemplate[]) => {
     try {
-      const newTemplates = await api.importWorkoutTemplates(importedTemplates)
+      const result = await api.importWorkoutTemplates(importedTemplates)
+      const { templates: newTemplates, createdExercises } = result
+
       setTemplates((prev) => [...newTemplates, ...prev])
-      toast.success(`${newTemplates.length} template(s) importado(s) com sucesso!`)
+
+      // Show success message with details about created exercises
+      let successMessage = `${newTemplates.length} template(s) importado(s) com sucesso!`
+      if (createdExercises.length > 0) {
+        successMessage += ` ${createdExercises.length} exercício(s) criado(s) automaticamente: ${createdExercises.join(', ')}`
+      }
+
+      toast.success(successMessage)
+
+      // Refresh templates list to get updated exercise IDs
+      await load()
     } catch (e: any) {
       throw new Error(e?.message || 'Erro ao importar templates')
     }
@@ -238,13 +251,13 @@ export default function TemplatesPage() {
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
             {sortedTemplates.map((template, idx) => {
-              const totalSets = template.exercises.reduce((acc, ex) => acc + ex.sets, 0)
+              const totalSets = template.exercises.reduce((acc, ex) => acc + toNumber(ex.sets), 0)
               const totalExercises = template.exercises.length
-              const totalReps = template.exercises.reduce((acc, ex) => acc + (ex.reps * ex.sets), 0)
+              const totalReps = template.exercises.reduce((acc, ex) => acc + (toNumber(ex.reps) * toNumber(ex.sets)), 0)
               const avgWeight = template.exercises.length > 0
                 ? Math.round(template.exercises.reduce((acc, ex) => acc + (ex.load || 0), 0) / template.exercises.length)
                 : 0
-              const estimatedDuration = template.exercises.reduce((acc, ex) => acc + (ex.restSec || 60) * ex.sets, 0) / 60 // in minutes
+              const estimatedDuration = template.exercises.reduce((acc, ex) => acc + (toNumber(ex.restSec) || 60) * toNumber(ex.sets), 0) / 60 // in minutes
 
               return (
                 <motion.div

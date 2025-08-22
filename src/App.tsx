@@ -25,30 +25,51 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Header */}
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/90 hidden md:block">
-        <div className="container-app flex items-center justify-between py-4">
-          <Link to="/" className="text-heading-3 font-bold tracking-tight">Workout Online</Link>
-          <nav className="flex items-center gap-8 text-body">
+      <header className="sticky top-0 z-40 border-b border-border/40 bg-background/95 backdrop-blur-sm supports-[backdrop-filter]:bg-background/80 hidden md:block">
+        <div className="container-app flex items-center justify-between h-14">
+          {/* Logo/Brand */}
+          <Link
+            to="/"
+            className="flex items-center gap-3 group transition-colors duration-200 hover:opacity-80"
+          >
+            <div className="w-6 h-6 bg-primary rounded-md flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-xs">W</span>
+            </div>
+            <span className="text-base font-medium text-foreground">
+              Workout Online
+            </span>
+          </Link>
+
+          {/* Navigation */}
+          <nav className="flex items-center gap-6">
             {[
               { to: '/treino', label: 'Treino' },
               { to: '/templates', label: 'Templates' },
               { to: '/history', label: 'Histórico' },
               { to: '/analytics', label: 'Analytics' },
               { to: '/settings', label: 'Configurações' },
-            ].map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={
-                  'px-3 py-2 rounded-lg transition-colors hover:bg-accent ' +
-                  (location.pathname.startsWith(item.to)
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'text-muted-foreground hover:text-foreground')
-                }
-              >
-                {item.label}
-              </Link>
-            ))}
+            ].map((item) => {
+              const isActive = location.pathname.startsWith(item.to)
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`
+                    relative px-3 py-2 text-sm font-medium
+                    transition-colors duration-200
+                    ${isActive
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                    }
+                  `}
+                >
+                  {item.label}
+                  {isActive && (
+                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-6 h-0.5 bg-primary rounded-full" />
+                  )}
+                </Link>
+              )
+            })}
           </nav>
         </div>
       </header>

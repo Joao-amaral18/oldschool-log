@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { formatRangeDisplay } from '@/lib/utils'
 import { ChevronDown, ChevronUp, Plus, Trash2, Dumbbell, MoreVertical } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { motion } from 'framer-motion'
@@ -21,7 +22,7 @@ export default function TemplateEditorPage() {
   const [template, setTemplate] = useState<WorkoutTemplate | null>(null)
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
-  const [setRowsByExercise, setSetRowsByExercise] = useState<Record<string, Array<{ reps: number; load: number; restSec: number }>>>({})
+  const [setRowsByExercise, setSetRowsByExercise] = useState<Record<string, Array<{ reps: string | number; load: number; restSec: string | number }>>>({})
   const [exerciseMenu, setExerciseMenu] = useState<{ exerciseId: string; index: number } | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
@@ -64,9 +65,9 @@ export default function TemplateEditorPage() {
         }
         setTemplate(t)
         // Initialize set rows per exercise based on current aggregate fields
-        const initial: Record<string, Array<{ reps: number; load: number; restSec: number }>> = {}
+        const initial: Record<string, Array<{ reps: string | number; load: number; restSec: string | number }>> = {}
         for (const te of t.exercises) {
-          const rows = Array.from({ length: Math.max(1, te.sets || 1) }, () => ({ reps: te.reps || 0, load: te.load || 0, restSec: te.restSec || 60 }))
+          const rows = Array.from({ length: Math.max(1, typeof te.sets === 'number' ? te.sets : parseInt(String(te.sets)) || 1) }, () => ({ reps: te.reps || 10, load: te.load || 0, restSec: te.restSec || 60 }))
           initial[te.id] = rows
         }
         setSetRowsByExercise(initial)
@@ -229,9 +230,9 @@ export default function TemplateEditorPage() {
         return {
           ...e,
           sets: rows.length,
-          reps: rows[0]?.reps ?? e.reps,
-          load: rows[0]?.load ?? e.load,
-          restSec: rows[0]?.restSec ?? e.restSec,
+          reps: rows[0]?.reps ?? e.reps ?? 10,
+          load: rows[0]?.load ?? e.load ?? 0,
+          restSec: rows[0]?.restSec ?? e.restSec ?? 60,
         }
       })
 
@@ -277,7 +278,7 @@ export default function TemplateEditorPage() {
     })
   }
 
-  const updateSetRow = (exerciseId: string, rowIndex: number, patch: Partial<{ reps: number; load: number; restSec: number }>) => {
+  const updateSetRow = (exerciseId: string, rowIndex: number, patch: Partial<{ reps: string | number; load: number; restSec: string | number }>) => {
     setSetRowsByExercise((prev) => {
       const rows = (prev[exerciseId] ?? []).slice()
       rows[rowIndex] = { ...rows[rowIndex], ...patch }
@@ -403,8 +404,9 @@ export default function TemplateEditorPage() {
                         <div className="col-span-3">
                           <label className="text-sm space-y-1">
                             <span className="block text-muted-foreground">Reps</span>
-                            <Input type="number" value={row.reps}
-                              onChange={(e) => updateSetRow(te.id, rowIdx, { reps: Number(e.target.value) })}
+                            <Input type="text" value={formatRangeDisplay(row.reps)}
+                              placeholder="10 ou 8-12"
+                              onChange={(e) => updateSetRow(te.id, rowIdx, { reps: e.target.value })}
                             />
                           </label>
                         </div>
@@ -419,8 +421,9 @@ export default function TemplateEditorPage() {
                         <div className="col-span-4">
                           <label className="text-sm space-y-1">
                             <span className="block text-muted-foreground">Descanso (s)</span>
-                            <Input type="number" value={row.restSec}
-                              onChange={(e) => updateSetRow(te.id, rowIdx, { restSec: Number(e.target.value) })}
+                            <Input type="text" value={formatRangeDisplay(row.restSec)}
+                              placeholder="60 ou 45-90"
+                              onChange={(e) => updateSetRow(te.id, rowIdx, { restSec: e.target.value })}
                             />
                           </label>
                         </div>

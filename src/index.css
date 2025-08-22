@@ -166,20 +166,8 @@ body {
     @apply w-full max-w-md bg-card rounded-xl;
 }
 
-.login-input {
-    @apply bg-input border border-border rounded-lg px-4 py-3 pl-12 text-base transition-colors focus:border-primary focus:outline-none;
-}
-
-.login-input::placeholder {
-    @apply text-muted-foreground;
-}
-
 .login-button {
     @apply w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-medium py-3 rounded-lg transition-colors;
-}
-
-.login-icon {
-    @apply absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground;
 }
 
 .login-error {

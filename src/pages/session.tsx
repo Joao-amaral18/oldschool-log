@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 
 import { cn } from '@/lib/utils'
-import { formatSeconds } from '@/lib/utils'
+import { formatSeconds, getRandomFromRange } from '@/lib/utils'
 import { toast } from 'sonner'
 import { X, Plus, ChevronDown, Timer, Circle, CheckCircle2 } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -48,7 +48,12 @@ export default function SessionPage() {
           const queued = await listQueuedPerformedSets()
           for (const item of queued) {
             try {
-              await api.addPerformedSet(item.performedExerciseId, item.set)
+              // Convert string reps to number for API call
+              const setData = {
+                ...item.set,
+                reps: typeof item.set.reps === 'number' ? item.set.reps : parseInt(String(item.set.reps)) || 0
+              }
+              await api.addPerformedSet(item.performedExerciseId, setData)
               await removeQueuedItem(item.id)
             } catch { }
           }
@@ -84,13 +89,13 @@ export default function SessionPage() {
         // Initialize local UI state for rows per exercise
         const init: Record<string, ExerciseLocalState> = {}
         for (const te of tpl.exercises) {
-          const count = Math.max(1, te.sets || 1)
+          const count = Math.max(1, typeof te.sets === 'number' ? te.sets : parseInt(String(te.sets)) || 1)
           init[te.id] = {
             isCompleted: false,
             sets: Array.from({ length: count }, (_, i) => ({
               id: i + 1,
-              reps: te.reps ? String(te.reps) : '',
-              load: te.load ? String(te.load) : '',
+              reps: String(getRandomFromRange(te.reps)),
+              load: String(te.load || 0),
               isCompleted: false,
             })),
           }
@@ -162,13 +167,16 @@ export default function SessionPage() {
   }
 
   // Progress based on local row completion
-  const totalSetsPlanned = template.exercises.reduce((acc, te) => acc + (exerciseStates[te.id]?.sets.length ?? te.sets), 0)
+  const totalSetsPlanned = template.exercises.reduce((acc, te) => {
+    const setsCount = typeof te.sets === 'number' ? te.sets : parseInt(String(te.sets)) || 1
+    return acc + (exerciseStates[te.id]?.sets.length ?? setsCount)
+  }, 0)
   const completedSetsCount = template.exercises.reduce((acc, te) => acc + (exerciseStates[te.id]?.sets.filter((s) => s.isCompleted).length ?? 0), 0)
   const progressValue = totalSetsPlanned > 0 ? (completedSetsCount / totalSetsPlanned) * 100 : 0
 
   const handleSetComplete = async (
     exerciseIndex: number,
-    setData: { load: number; reps: number; kind: 'warmup' | 'recognition' | 'working' },
+    setData: { load: number; reps: string | number; kind: 'warmup' | 'recognition' | 'working' },
   ) => {
     const performedExerciseId = performedExerciseIdsRef.current[exerciseIndex]
     if (!performedExerciseId) return
@@ -185,13 +193,19 @@ export default function SessionPage() {
       return next
     })
 
+    // Convert string reps to number for API calls
+    const apiSetData = {
+      ...newSet,
+      reps: typeof newSet.reps === 'number' ? newSet.reps : parseInt(String(newSet.reps)) || 0
+    }
+
     try {
-      await api.addPerformedSet(performedExerciseId, newSet)
+      await api.addPerformedSet(performedExerciseId, apiSetData)
     } catch {
       // Offline or API error: enqueue for background sync
       await enqueueSet({
         endpoint: '/offline/sets',
-        payload: { performedExerciseId, set: newSet },
+        payload: { performedExerciseId, set: apiSetData },
       })
       await registerSync()
       toast.info('Sem conexão. Série será sincronizada quando voltar internet.')
@@ -237,7 +251,8 @@ export default function SessionPage() {
         const row = exerciseStates[exerciseId]?.sets.find((s) => s.id === setId)
         const parsedLoad = row?.load ? Number(row.load) : 0
         const parsedReps = row?.reps ? Number(row.reps) : 0
-        if (parsedLoad > 0 && parsedReps > 0) {
+        // Load is optional, reps are required
+        if (parsedReps > 0) {
           void handleSetComplete(teIndex, { load: parsedLoad, reps: parsedReps, kind: 'working' })
         }
       }
@@ -366,8 +381,8 @@ export default function SessionPage() {
           const averaged: TemplateExercise[] = template.exercises.map((te, idx) => {
             const sets = performedSetsState[idx]
             const avgLoad = sets.length > 0 ? Math.round(sets.reduce((s, x) => s + x.load, 0) / sets.length) : te.load
-            const avgReps = sets.length > 0 ? Math.round(sets.reduce((s, x) => s + x.reps, 0) / sets.length) : te.reps
-            return { ...te, id: crypto.randomUUID(), load: avgLoad, reps: avgReps, sets: Math.max(sets.length, te.sets) }
+            const avgReps = sets.length > 0 ? Math.round(sets.reduce((s, x) => s + (typeof x.reps === 'number' ? x.reps : parseInt(String(x.reps)) || 0), 0) / sets.length) : (typeof te.reps === 'number' ? te.reps : parseInt(String(te.reps)) || 10)
+            return { ...te, id: crypto.randomUUID(), load: avgLoad, reps: avgReps, sets: Math.max(sets.length, typeof te.sets === 'number' ? te.sets : parseInt(String(te.sets)) || 1) }
           })
           await api.createTemplateWithExercises(templateName.trim(), averaged)
           toast.success('Template salvo!')
@@ -538,7 +553,7 @@ export default function SessionPage() {
                       </h3>
                       <div className="flex items-center gap-4 mt-1">
                         <span className="text-sm text-muted-foreground">
-                          {Math.max(1, te.sets || 1)} séries
+                          {Math.max(1, typeof te.sets === 'number' ? te.sets : parseInt(String(te.sets)) || 1)} séries
                         </span>
                         {te.reps && (
                           <span className="text-sm text-muted-foreground">

@@ -24,10 +24,10 @@ export type Exercise = {
 export type TemplateExercise = {
     id: string
     exerciseId: string
-    sets: number
-    reps: number
+    sets: string | number
+    reps: string | number
     load: number
-    restSec: number
+    restSec: string | number
 }
 
 export type WorkoutTemplate = {
@@ -39,7 +39,7 @@ export type WorkoutTemplate = {
 
 export type PerformedSet = {
     id: string
-    reps: number
+    reps: string | number
     load: number
     kind: 'warmup' | 'recognition' | 'working'
 }
