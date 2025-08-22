@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"
+    role="img" aria-labelledby="title">
+    <title>Workout Tracker App Icon</title>
+    <!-- Background (set with CSS or inline fill) -->
+    <rect x="64" y="64" width="896" height="896" rx="220" ry="220" fill="currentColor" />
+    <!-- Glyph -->
+    <g transform="translate(0,0) scale(1)" fill="none" stroke="#FFFFFF" stroke-width="40"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="512" cy="520" r="300" />
+        <path d="M400 220h224" />
+        <path d="M740 280l60 60" />
+        <polyline points="280,520 380,520 430,420 512,650 594,520 744,520" />
+    </g>
+</svg>

@@ -23,26 +23,58 @@ export default function TemplateEditorPage() {
   const [loading, setLoading] = useState(true)
   const [setRowsByExercise, setSetRowsByExercise] = useState<Record<string, Array<{ reps: number; load: number; restSec: number }>>>({})
   const [exerciseMenu, setExerciseMenu] = useState<{ exerciseId: string; index: number } | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  const handleBack = async () => {
+    if (id === 'new' && hasUnsavedChanges && template && (template.name !== 'Novo Template' || template.exercises.length > 0)) {
+      const confirmed = await modal.confirm({
+        title: 'Sair sem salvar?',
+        description: 'Você tem alterações não salvas. Tem certeza que deseja sair?',
+        confirmText: 'Sair',
+        cancelText: 'Continuar editando',
+        variant: 'destructive'
+      })
+      if (!confirmed) return
+    }
+    navigate('/templates')
+  }
 
   const load = async () => {
     try {
       setLoading(true)
-      const t = await api.getTemplate(id!)
-      if (!t) {
-        navigate('/templates')
-        return
+
+      // Handle new template creation
+      if (id === 'new') {
+        const newTemplate: WorkoutTemplate = {
+          id: '',
+          name: 'Novo Template',
+          exercises: [],
+          created_at: new Date().toISOString()
+        }
+        setTemplate(newTemplate)
+        setSetRowsByExercise({})
+        setHasUnsavedChanges(false)
+      } else {
+        // Load existing template
+        const t = await api.getTemplate(id!)
+        if (!t) {
+          toast.error('Template não encontrado')
+          navigate('/templates')
+          return
+        }
+        setTemplate(t)
+        // Initialize set rows per exercise based on current aggregate fields
+        const initial: Record<string, Array<{ reps: number; load: number; restSec: number }>> = {}
+        for (const te of t.exercises) {
+          const rows = Array.from({ length: Math.max(1, te.sets || 1) }, () => ({ reps: te.reps || 0, load: te.load || 0, restSec: te.restSec || 60 }))
+          initial[te.id] = rows
+        }
+        setSetRowsByExercise(initial)
       }
-      setTemplate(t)
+
       // Load all user's exercises for selection (not only those in the template)
       const ex = await api.listExercises()
       setExercises(ex)
-      // Initialize set rows per exercise based on current aggregate fields
-      const initial: Record<string, Array<{ reps: number; load: number; restSec: number }>> = {}
-      for (const te of t.exercises) {
-        const rows = Array.from({ length: Math.max(1, te.sets || 1) }, () => ({ reps: te.reps || 0, load: te.load || 0, restSec: te.restSec || 60 }))
-        initial[te.id] = rows
-      }
-      setSetRowsByExercise(initial)
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao carregar template')
       navigate('/templates')
@@ -87,7 +119,12 @@ export default function TemplateEditorPage() {
     return <TemplateEditorSkeleton />
   }
 
-  const setName = (name: string) => setTemplate({ ...template, name })
+  const setName = (name: string) => {
+    if (template) {
+      setTemplate({ ...template, name })
+      if (id === 'new') setHasUnsavedChanges(true)
+    }
+  }
 
   // helper removed
 
@@ -112,6 +149,7 @@ export default function TemplateEditorPage() {
           }
           setTemplate((prev) => prev ? { ...prev, exercises: [...prev.exercises, newItem] } : prev)
           setSetRowsByExercise((prev) => ({ ...prev, [newItem.id]: [{ reps: 10, load: 0, restSec: 60 }] }))
+          if (id === 'new') setHasUnsavedChanges(true)
           toast.success('Exercício criado!')
         } catch (e: any) {
           toast.error(e?.message || 'Erro ao criar exercício')
@@ -129,6 +167,7 @@ export default function TemplateEditorPage() {
       }
       setTemplate({ ...template, exercises: [...template.exercises, item] })
       setSetRowsByExercise((prev) => ({ ...prev, [item.id]: [{ reps: 10, load: 0, restSec: 60 }] }))
+      if (id === 'new') setHasUnsavedChanges(true)
     }
   }
 
@@ -183,24 +222,39 @@ export default function TemplateEditorPage() {
         }
       }
       // Map set rows back to aggregate fields for persistence
-      const mapped: WorkoutTemplate = {
-        ...template,
-        exercises: template.exercises.map((e) => {
-          const rows = setRowsByExercise[e.id] && setRowsByExercise[e.id].length > 0
-            ? setRowsByExercise[e.id]
-            : [{ reps: e.reps ?? 10, load: e.load ?? 0, restSec: e.restSec ?? 60 }]
-          return {
-            ...e,
-            sets: rows.length,
-            reps: rows[0]?.reps ?? e.reps,
-            load: rows[0]?.load ?? e.load,
-            restSec: rows[0]?.restSec ?? e.restSec,
-          }
-        })
+      const mappedExercises: TemplateExercise[] = template.exercises.map((e) => {
+        const rows = setRowsByExercise[e.id] && setRowsByExercise[e.id].length > 0
+          ? setRowsByExercise[e.id]
+          : [{ reps: e.reps ?? 10, load: e.load ?? 0, restSec: e.restSec ?? 60 }]
+        return {
+          ...e,
+          sets: rows.length,
+          reps: rows[0]?.reps ?? e.reps,
+          load: rows[0]?.load ?? e.load,
+          restSec: rows[0]?.restSec ?? e.restSec,
+        }
+      })
+
+      // Handle new vs existing template
+      if (id === 'new' || !template.id) {
+        // Create new template
+        const newTemplate = await api.createTemplateWithExercises(nameTrimmed, mappedExercises)
+        setHasUnsavedChanges(false)
+        toast.success('Template criado!')
+        // Navigate to the new template's edit page so user can continue editing
+        navigate(`/templates/editor/${newTemplate.id}`)
+      } else {
+        // Update existing template
+        const mapped: WorkoutTemplate = {
+          ...template,
+          name: nameTrimmed,
+          exercises: mappedExercises
+        }
+        await api.saveTemplateFull(mapped)
+        setHasUnsavedChanges(false)
+        toast.success('Template salvo!')
+        navigate('/templates')
       }
-      await api.saveTemplateFull(mapped)
-      toast.success('Template salvo!')
-      navigate('/templates')
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao salvar template')
     }
@@ -254,7 +308,7 @@ export default function TemplateEditorPage() {
           >
             Salvar
           </Button>
-          <Button variant="outline" onClick={() => navigate('/templates')}>Voltar</Button>
+          <Button variant="outline" onClick={handleBack}>Voltar</Button>
         </div>
       </div>
 

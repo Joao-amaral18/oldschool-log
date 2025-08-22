@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import { MobileHeader } from '@/components/layout/MobileHeader'
 import { BottomTabBar } from '@/components/layout/BottomTabBar'
 import { cn } from '@/lib/utils'
+import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 
 function App() {
   const location = useLocation()
@@ -59,6 +60,9 @@ function App() {
 
       {/* Mobile Bottom Tab Bar */}
       <BottomTabBar />
+
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   )
 }
