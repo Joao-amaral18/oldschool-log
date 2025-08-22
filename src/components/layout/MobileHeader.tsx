@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input'
 import {
     Sheet,
     SheetContent,
-    SheetHeader,
     SheetTitle,
     SheetTrigger,
 } from '@/components/ui/sheet'
@@ -34,7 +33,7 @@ const getPageTitle = (pathname: string): string => {
     if (pathname.startsWith('/analytics/prs')) return 'Meus Recordes'
     if (pathname === '/settings') return 'Configurações'
     if (pathname === '/login') return 'Login'
-    return 'Oldschool Log'
+    return 'Workout Online'
 }
 
 export function MobileHeader() {
@@ -96,42 +95,41 @@ export function MobileHeader() {
 
     if (isEditingTemplate) {
         return (
-            <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
+            <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/90 md:hidden">
                 <div className="flex h-14 items-center justify-between px-4">
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="h-9 w-9"
+                        className="h-10 w-10"
                         onClick={() => navigate('/templates')}
                     >
                         <X className="h-5 w-5" />
                         <span className="sr-only">Cancelar</span>
                     </Button>
-                    <h1 className="font-semibold text-foreground">
+                    <h1 className="text-heading-3 font-semibold">
                         Editar Template
                     </h1>
                     <Button
                         variant="ghost"
                         size="sm"
-                        className={`h-9 ${
-                            canSaveTemplate
-                                ? 'text-emerald-400'
-                                : 'text-muted-foreground'
-                        }`}
+                        className={`h-10 px-4 font-medium ${canSaveTemplate
+                            ? 'text-primary'
+                            : 'text-muted-foreground'
+                            }`}
                         onClick={handleTemplateSave}
                         disabled={!canSaveTemplate}
                     >
-                        <Check className="h-4 w-4 mr-1" /> Salvar
+                        <Check className="h-4 w-4 mr-2" /> Salvar
                     </Button>
                 </div>
-                <div className="px-4 pb-2">
+                <div className="px-4 pb-4">
                     <Input
                         value={templateName}
                         onChange={(e) =>
                             handleTemplateNameChange(e.target.value)
                         }
                         placeholder="Nome do template"
-                        className="h-9 text-base font-medium"
+                        className="h-11 text-base"
                     />
                 </div>
             </header>
@@ -139,30 +137,30 @@ export function MobileHeader() {
     }
 
     return (
-        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
+        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/90 md:hidden">
             <div className="flex h-14 items-center justify-between px-4">
                 <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                     <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9">
+                        <Button variant="ghost" size="icon" className="h-10 w-10">
                             <Menu className="h-5 w-5" />
                             <span className="sr-only">Abrir menu</span>
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="left" className="w-72">
-                        <SheetHeader>
-                            <SheetTitle className="text-left">
-                                Oldschool Log
+                    <SheetContent side="left" className="w-80 p-0">
+                        <div className="p-6 border-b">
+                            <SheetTitle className="text-left text-heading-2">
+                                Workout Online
                             </SheetTitle>
-                        </SheetHeader>
-                        <div className="mt-6 space-y-2">
+                        </div>
+                        <div className="p-6 space-y-3">
                             {session && (
-                                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                                <div className="flex items-center gap-3 p-4 rounded-xl bg-muted">
                                     <User className="h-5 w-5 text-muted-foreground" />
                                     <div>
-                                        <div className="font-medium">
+                                        <div className="font-medium text-foreground">
                                             {session.username}
                                         </div>
-                                        <div className="text-xs text-muted-foreground">
+                                        <div className="text-sm text-muted-foreground">
                                             Usuário logado
                                         </div>
                                     </div>
@@ -171,7 +169,7 @@ export function MobileHeader() {
 
                             <Button
                                 variant="ghost"
-                                className="w-full justify-start gap-3 h-11"
+                                className="w-full justify-start gap-3 h-12 text-body"
                                 onClick={() => handleMenuItemClick('/analytics')}
                             >
                                 <BarChart2 className="h-5 w-5" />
@@ -180,7 +178,7 @@ export function MobileHeader() {
 
                             <Button
                                 variant="ghost"
-                                className="w-full justify-start gap-3 h-11"
+                                className="w-full justify-start gap-3 h-12 text-body"
                                 onClick={() => handleMenuItemClick('/settings')}
                             >
                                 <Settings className="h-5 w-5" />
@@ -189,7 +187,7 @@ export function MobileHeader() {
 
                             <Button
                                 variant="ghost"
-                                className="w-full justify-start gap-3 h-11 text-destructive hover:text-destructive"
+                                className="w-full justify-start gap-3 h-12 text-destructive hover:text-destructive hover:bg-destructive/10"
                                 onClick={handleLogout}
                             >
                                 <LogOut className="h-5 w-5" />
@@ -199,10 +197,10 @@ export function MobileHeader() {
                     </SheetContent>
                 </Sheet>
 
-                <h1 className="font-semibold text-foreground">{pageTitle}</h1>
+                <h1 className="text-heading-3 font-semibold">{pageTitle}</h1>
 
                 {/* Spacer para balancear o layout */}
-                <div className="w-9" />
+                <div className="w-10" />
             </div>
         </header>
     )

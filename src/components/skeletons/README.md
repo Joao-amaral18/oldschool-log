@@ -1,6 +1,6 @@
 # Skeleton Loading System
 
-A clean, minimal skeleton loading system with smooth shimmer animations designed for the Oldschool Log application.
+A clean, minimal skeleton loading system with smooth shimmer animations designed for the Workout Online application.
 
 ## Features
 

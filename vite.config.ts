@@ -15,7 +15,7 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['vite.svg'],
       manifest: {
-        name: 'Oldschool Log',
+        name: 'Workout Online',
         short_name: 'Oldschool',
         description: 'Registre seus treinos com fluidez, mesmo offline.',
         theme_color: '#121212',
@@ -24,6 +24,23 @@ export default defineConfig({
         orientation: 'portrait',
         scope: '/',
         start_url: '/',
+        categories: ['health', 'fitness', 'productivity'],
+        shortcuts: [
+          {
+            name: 'Novo Treino',
+            short_name: 'Treino',
+            description: 'Iniciar um novo treino',
+            url: '/treino',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }]
+          },
+          {
+            name: 'Histórico',
+            short_name: 'Histórico',
+            description: 'Ver histórico de treinos',
+            url: '/history',
+            icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }]
+          }
+        ],
         icons: [
           {
             src: 'icons/icon-192.png',

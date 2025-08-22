@@ -12,7 +12,7 @@ const TemplateEditorPage = lazy(() => import('./pages/templates/editor'))
 const SessionPage = lazy(() => import('./pages/session'))
 const HistoryPage = lazy(() => import('./pages/history'))
 const SettingsPage = lazy(() => import('./pages/settings'))
-const PerformanceDashboardPage = lazy(() => import('./pages/analytics/Dashboard'))
+const AnalyticsPage = lazy(() => import('./pages/analytics/Analytics'))
 const ExerciseProgressPage = lazy(() => import('./pages/analytics/ExerciseProgress'))
 const VolumeAnalysisPage = lazy(() => import('./pages/analytics/VolumeAnalysis'))
 const HabitsPage = lazy(() => import('./pages/analytics/Habits'))
@@ -108,7 +108,7 @@ createRoot(document.getElementById('root')!).render(
                   path="analytics"
                   element={
                     <RequireAuth>
-                      <Suspense fallback={null}><PerformanceDashboardPage /></Suspense>
+                      <Suspense fallback={null}><AnalyticsPage /></Suspense>
                     </RequireAuth>
                   }
                 />

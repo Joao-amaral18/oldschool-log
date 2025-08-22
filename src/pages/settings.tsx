@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { SettingsSkeleton } from '@/components/skeletons'
+import { notificationUtils } from '@/lib/notifications'
+import { Bell, Wifi, WifiOff } from 'lucide-react'
 
 export default function SettingsPage() {
   const { session, logout } = useAuth()
@@ -18,6 +20,8 @@ export default function SettingsPage() {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; item?: Exercise } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [notificationStatus, setNotificationStatus] = useState<NotificationPermission>('default')
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
 
   const load = async () => {
     try {
@@ -37,6 +41,23 @@ export default function SettingsPage() {
       return
     }
     load()
+
+    // Update notification status
+    if (notificationUtils.isSupported()) {
+      setNotificationStatus(notificationUtils.getPermission())
+    }
+
+    // Listen for online/offline events
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
   }, [session])
 
   const onSubmitExercise = async (data: { name: string; muscleGroup: Exercise['muscleGroup'] }) => {
@@ -74,6 +95,41 @@ export default function SettingsPage() {
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao excluir exercício')
     }
+  }
+
+  const testNotification = async () => {
+    const success = await notificationUtils.sendTestNotification()
+    if (success) {
+      setNotificationStatus('granted')
+    } else {
+      setNotificationStatus('denied')
+    }
+  }
+
+  const requestNotificationPermission = async () => {
+    const permission = await notificationUtils.requestPermission()
+    setNotificationStatus(permission)
+    if (permission === 'granted') {
+      toast.success('Permissão de notificação concedida!')
+    } else {
+      toast.error('Permissão de notificação negada.')
+    }
+  }
+
+  const testOffline = async () => {
+    if (!isOnline) {
+      toast.info('Você já está offline! Teste concluído.')
+      return
+    }
+
+    toast.info('Desconecte-se da internet para testar o modo offline')
+
+    // Simulate going offline after a delay
+    setTimeout(() => {
+      if (navigator.onLine) {
+        toast.info('Desconecte-se da internet e recarregue a página para ver o modo offline em ação')
+      }
+    }, 2000)
   }
 
   const dangerPurge = async () => {
@@ -160,6 +216,67 @@ export default function SettingsPage() {
             </Card>
           ))}
           {exercises.length === 0 && <div className="text-sm text-muted-foreground">Nenhum exercício cadastrado.</div>}
+        </div>
+      </section>
+
+      {notificationUtils.isSupported() && (
+        <section className="space-y-3">
+          <h2 className="font-semibold">Notificações</h2>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <Bell className="h-4 w-4" />
+                <div>
+                  <p className="font-medium text-sm">Status das Notificações</p>
+                  <p className="text-xs text-muted-foreground">
+                    {notificationStatus === 'granted' && 'Ativadas'}
+                    {notificationStatus === 'denied' && 'Negadas'}
+                    {notificationStatus === 'default' && 'Não solicitadas'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {notificationStatus !== 'granted' && (
+                <Button variant="outline" onClick={requestNotificationPermission} className="flex-1">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Solicitar Permissão
+                </Button>
+              )}
+              <Button variant="outline" onClick={testNotification} className="flex-1">
+                <Bell className="h-4 w-4 mr-2" />
+                Testar Notificação
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <h2 className="font-semibold">Funcionalidades Offline</h2>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-3 border rounded-lg">
+            <div className="flex items-center gap-3">
+              {isOnline ? (
+                <Wifi className="h-4 w-4 text-green-500" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-red-500" />
+              )}
+              <div>
+                <p className="font-medium text-sm">Status da Conexão</p>
+                <p className="text-xs text-muted-foreground">
+                  {isOnline ? 'Online' : 'Offline'}
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" onClick={testOffline} className="w-full">
+            <WifiOff className="h-4 w-4 mr-2" />
+            Testar Modo Offline
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Desconecte-se da internet e recarregue a página para testar o modo offline
+          </p>
         </div>
       </section>
 

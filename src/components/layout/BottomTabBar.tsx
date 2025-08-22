@@ -20,26 +20,26 @@ export function BottomTabBar() {
 
     return (
         <nav
-            className={`fixed bottom-4 left-4 right-4 z-10 overflow-hidden rounded-2xl border border-stone-700 border-border/40 bg-card/50 backdrop-blur-xl transition-transform duration-300 md:hidden ${scrollDirection === 'down'
-                    ? 'translate-y-[calc(100%+2rem)]'
-                    : 'translate-y-0'
+            className={`fixed bottom-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-md border-t border-border transition-transform duration-300 md:hidden ${scrollDirection === 'down'
+                ? 'translate-y-full'
+                : 'translate-y-0'
                 }`}
         >
-            <div className="flex justify-around items-center h-16">
+            <div className="flex justify-around items-center h-16 px-2 safe-padded">
                 {tabs.map((tab) => (
                     <NavLink
                         key={tab.path}
                         to={tab.path}
                         className={({ isActive }) =>
-                            `relative z-20 flex-1 flex flex-col items-center justify-center text-center transition-colors duration-200 ${isActive ||
+                            `relative flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-lg transition-colors duration-200 min-h-[44px] ${isActive ||
                                 (location.pathname === '/' &&
                                     tab.path === '/treino')
-                                ? 'text-primary'
-                                : 'text-muted-foreground hover:text-foreground'
+                                ? 'text-primary bg-primary/10'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                             }`
                         }
                     >
-                        <tab.icon className="w-6 h-6 mb-1" aria-hidden="true" />
+                        <tab.icon className="w-5 h-5 mb-1" aria-hidden="true" />
                         <span className="text-xs font-medium">{tab.label}</span>
                     </NavLink>
                 ))}

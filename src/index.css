@@ -1,32 +1,31 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
-/* Theme tokens - clean, minimal palette */
+/* Modern minimal theme tokens */
 @theme {
     --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI,
         Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji",
         "Segoe UI Emoji";
-    --radius: 0.6rem;
+    --radius: 0.75rem;
 
-    /* Dark gray (stone-like) theme with vibrant primary */
-    --color-background: hsl(0 0% 7%); /* ~#121212 */
-    --color-foreground: hsl(0 0% 96%); /* near white */
-    --color-muted: hsl(0 0% 10%); /* ~#1a1a1a */
-    --color-muted-foreground: hsl(0 0% 60%); /* soft gray */
-    --color-card: hsl(0 0% 12%); /* ~#1f1f1f */
-    --color-card-foreground: hsl(0 0% 96%);
-    --color-primary: hsl(142.1 76.2% 36.3%);
-    --color-primary-foreground: hsl(355.7 100% 97.3%);
+    /* Modern dark theme with subtle primary */
+    --color-background: hsl(0 0% 4%); /* Pure dark */
+    --color-foreground: hsl(0 0% 98%); /* Near white */
+    --color-muted: hsl(0 0% 8%); /* Subtle gray */
+    --color-muted-foreground: hsl(0 0% 65%); /* Medium gray */
+    --color-card: hsl(0 0% 6%); /* Slightly lighter than background */
+    --color-card-foreground: hsl(0 0% 98%);
+    --color-primary: hsl(142 70% 45%); /* More subtle green */
+    --color-primary-foreground: hsl(0 0% 100%);
     --color-secondary: hsl(0 0% 10%);
-    --color-secondary-foreground: hsl(0 0% 85%);
-    --color-accent: hsl(0 0% 14%);
-    --color-accent-foreground: hsl(0 0% 90%);
-    --color-destructive: hsl(0 62.8% 30.6%);
-    --color-destructive: hsl(0 62.8% 30.6%);
-    --color-destructive-foreground: hsl(60 9.1% 97.8%);
-    --color-border: rgb(41 37 36); /* stone-800 */
-    --color-input: hsl(0 0% 20%);
-    --color-ring: hsl(142.1 76.2% 36.3%);
+    --color-secondary-foreground: hsl(0 0% 90%);
+    --color-accent: hsl(0 0% 12%);
+    --color-accent-foreground: hsl(0 0% 95%);
+    --color-destructive: hsl(0 75% 55%);
+    --color-destructive-foreground: hsl(0 0% 100%);
+    --color-border: hsl(0 0% 15%);
+    --color-input: hsl(0 0% 15%);
+    --color-ring: hsl(142 70% 45%);
 }
 
 :root {
@@ -40,11 +39,11 @@ body,
 }
 
 body {
-    @apply bg-gradient-to-br from-background via-background to-muted/30 text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased;
 }
 
 .container-app {
-    @apply mx-auto w-full max-w-[1100px] px-4;
+    @apply mx-auto w-full max-w-[1100px] px-4 sm:px-6;
 }
 
 /* Smooth transitions */
@@ -52,24 +51,74 @@ body {
     @apply transition-[color,background,opacity,transform] duration-200;
 }
 
-/* Elevated sections with depth */
-.surface {
-    @apply rounded-xl border-stone-800 border bg-card/50 backdrop-blur-sm shadow-lg ring-1 ring-white/5;
+/* Modern typography system */
+.text-display {
+    @apply text-4xl font-bold leading-tight tracking-tight;
 }
 
-/* Ensure mobile modals and sticky headers account for mobile safe areas */
+.text-heading-1 {
+    @apply text-3xl font-semibold leading-tight tracking-tight;
+}
+
+.text-heading-2 {
+    @apply text-2xl font-semibold leading-tight;
+}
+
+.text-heading-3 {
+    @apply text-xl font-medium leading-snug;
+}
+
+.text-body-large {
+    @apply text-lg leading-relaxed;
+}
+
+.text-body {
+    @apply text-base leading-relaxed;
+}
+
+.text-body-small {
+    @apply text-sm leading-relaxed;
+}
+
+.text-caption {
+    @apply text-xs leading-normal tracking-wide uppercase font-medium;
+}
+
+/* Clean surface styling */
+.surface {
+    @apply rounded-xl bg-card;
+}
+
+/* Mobile optimizations */
 .safe-padded {
     padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Interactive elements */
-.interactive {
-    @apply hover:scale-[1.02] active:scale-[0.98] transition-transform;
+/* Better touch targets for mobile */
+@media (max-width: 768px) {
+    .touch-target {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Increase spacing on mobile */
+    .container-app {
+        @apply px-5;
+    }
+
+    /* Better text sizes on mobile */
+    .text-display {
+        @apply text-3xl;
+    }
+
+    .text-heading-1 {
+        @apply text-2xl;
+    }
 }
 
-/* Glow effect for primary elements */
-.glow {
-    @apply shadow-lg shadow-primary/20;
+/* Subtle interactive elements */
+.interactive {
+    @apply hover:bg-accent/50 active:bg-accent transition-colors;
 }
 
 /* Skeleton loading animations */
@@ -108,35 +157,31 @@ body {
     }
 }
 
-/* Login specific styles */
+/* Modern login styles */
 .login-container {
-    @apply min-h-screen bg-[#181818] flex items-center justify-center p-4;
+    @apply min-h-screen bg-background flex items-center justify-center p-4;
 }
 
 .login-card {
-    @apply w-full max-w-[380px] bg-[#1F1F1F] rounded-2xl border border-stone-800 shadow-2xl;
+    @apply w-full max-w-md bg-card rounded-xl;
 }
 
 .login-input {
-    @apply bg-[#1F1F1F] border border-stone-800 rounded-lg px-4 py-3 pl-12 text-base transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none;
+    @apply bg-input border border-border rounded-lg px-4 py-3 pl-12 text-base transition-colors focus:border-primary focus:outline-none;
 }
 
 .login-input::placeholder {
-    @apply text-gray-500;
+    @apply text-muted-foreground;
 }
 
 .login-button {
-    @apply w-full bg-primary hover:bg-primary/90 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-full transition-all duration-200 hover:scale-[1.02] active:scale-[0.98];
-}
-
-.login-button:disabled {
-    @apply transform-none;
+    @apply w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-medium py-3 rounded-lg transition-colors;
 }
 
 .login-icon {
-    @apply absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400;
+    @apply absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground;
 }
 
 .login-error {
-    @apply text-red-400 text-sm mt-1 flex items-center gap-2;
+    @apply text-destructive text-sm mt-1 flex items-center gap-2;
 }

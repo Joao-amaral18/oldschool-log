@@ -74,7 +74,7 @@ export default function PWAInstallPrompt() {
                                 <Download className="h-4 w-4 text-primary" />
                             </div>
                             <div>
-                                <h4 className="font-medium text-sm">Install Oldschool Log</h4>
+                                <h4 className="font-medium text-sm">Install Workout Online</h4>
                                 <p className="text-xs text-muted-foreground mt-1">
                                     Install this app on your device for a better experience
                                 </p>

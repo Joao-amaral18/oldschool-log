@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import type { WorkoutTemplate } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Pencil, Copy, Trash2, Search, Layers, Dumbbell, Clock, Plus, Upload } from 'lucide-react'
+import { Pencil, Copy, Trash2, Search, Layers, Dumbbell, Clock, Plus, Upload, Play, Heart, Star, Filter } from 'lucide-react'
 import { api, fetchWorkoutTemplates } from '@/lib/api'
 import { toast } from 'sonner'
 import { TemplateListSkeleton } from '@/components/skeletons'
@@ -17,9 +17,11 @@ export default function TemplatesPage() {
   const { session } = useAuth()
   const navigate = useNavigate()
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([])
+  const [exercises, setExercises] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<'recent' | 'name'>('recent')
+  const [sort, setSort] = useState<'recent' | 'name' | 'favorites'>('recent')
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showImportModal, setShowImportModal] = useState(false)
   const modal = useModal()
 
@@ -27,8 +29,18 @@ export default function TemplatesPage() {
     if (!session) return
     try {
       setLoading(true)
-      const data = await fetchWorkoutTemplates(session.userId)
-      setTemplates(data)
+      const [templatesData, exercisesData] = await Promise.all([
+        fetchWorkoutTemplates(session.userId),
+        api.listExercises()
+      ])
+      setTemplates(templatesData)
+      setExercises(exercisesData)
+
+      // Load favorites from localStorage
+      const savedFavorites = localStorage.getItem(`template-favorites-${session.userId}`)
+      if (savedFavorites) {
+        setFavorites(new Set(JSON.parse(savedFavorites)))
+      }
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao carregar templates')
     } finally {
@@ -91,168 +103,348 @@ export default function TemplatesPage() {
     }
   }
 
+  const startWorkoutFromTemplate = async (templateId: string) => {
+    try {
+      const template = templates.find(t => t.id === templateId)
+      if (!template) {
+        toast.error('Template não encontrado')
+        return
+      }
+
+      // Start workout from template
+      const started = await api.startWorkout(template)
+      navigate(`/session/${started.workoutId}`)
+      toast.success(`Treino "${template.name}" iniciado!`)
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao iniciar treino do template')
+    }
+  }
+
+  const toggleFavorite = (templateId: string) => {
+    if (!session) return
+
+    const newFavorites = new Set(favorites)
+    if (newFavorites.has(templateId)) {
+      newFavorites.delete(templateId)
+    } else {
+      newFavorites.add(templateId)
+    }
+
+    setFavorites(newFavorites)
+    localStorage.setItem(`template-favorites-${session.userId}`, JSON.stringify([...newFavorites]))
+  }
+
   const sortedTemplates = useMemo(() => {
     const filtered = templates.filter((t) =>
       t.name.toLowerCase().includes(query.toLowerCase())
     )
+
+    if (sort === 'favorites') {
+      return filtered.sort((a, b) => {
+        const aIsFav = favorites.has(a.id)
+        const bIsFav = favorites.has(b.id)
+        if (aIsFav && !bIsFav) return -1
+        if (!aIsFav && bIsFav) return 1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+    }
+
     if (sort === 'name') {
       return filtered.sort((a, b) => a.name.localeCompare(b.name))
     }
+
     // "recent" is the default, which is already sorted by created_at desc
     return filtered
-  }, [templates, query, sort])
+  }, [templates, query, sort, favorites])
 
   if (loading) {
     return <TemplateListSkeleton />
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Meus Templates
-        </h1>
-        <div className="flex gap-2 w-full md:w-auto">
-          <Button variant="outline" onClick={() => setShowImportModal(true)} className="w-full md:w-auto">
-            <Upload className="mr-2 h-4 w-4" /> Importar JSON
-          </Button>
-          <Button onClick={createNew} className="w-full md:w-auto">
-            <Plus className="mr-2 h-4 w-4" /> Criar Novo Template
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="container mx-auto p-4 md:p-6 space-y-8">
+        {/* Header Section */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-3xl blur-3xl" />
+          <div className="relative bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl p-6 md:p-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="space-y-2">
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                  Meus Templates
+                </h1>
+                <p className="text-muted-foreground text-lg">
+                  Gerencie e organize seus treinos personalizados
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <Button variant="outline" onClick={() => setShowImportModal(true)} className="w-full sm:w-auto">
+                  <Upload className="mr-2 h-4 w-4" /> Importar
+                </Button>
+                <Button onClick={createNew} className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                  <Plus className="mr-2 h-4 w-4" /> Criar Template
+                </Button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Buscar por nome..."
-            className="pl-9"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        <div>
-          <select
-            value={sort}
-            onChange={(e) =>
-              setSort(e.target.value as 'recent' | 'name')
-            }
-            className="h-10 w-full md:w-auto rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        {/* Search and Filter Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-col md:flex-row gap-4 items-start md:items-center"
+        >
+          <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full md:w-auto">
+            <div className="relative flex-1 md:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar templates..."
+                className="pl-10 h-11 border-0 bg-muted/50 focus:bg-background transition-colors"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="h-11">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtros
+              </Button>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as 'recent' | 'name' | 'favorites')}
+                className="h-11 px-4 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="recent">Mais Recentes</option>
+                <option value="favorites">Favoritos Primeiro</option>
+                <option value="name">Ordem Alfabética</option>
+              </select>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Templates Grid */}
+        {sortedTemplates.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
-            <option value="recent">Mais Recentes</option>
-            <option value="name">Ordem Alfabética</option>
-          </select>
-        </div>
-      </div>
+            {sortedTemplates.map((template, idx) => {
+              const totalSets = template.exercises.reduce((acc, ex) => acc + ex.sets, 0)
+              const totalExercises = template.exercises.length
+              const totalReps = template.exercises.reduce((acc, ex) => acc + (ex.reps * ex.sets), 0)
+              const avgWeight = template.exercises.length > 0
+                ? Math.round(template.exercises.reduce((acc, ex) => acc + (ex.load || 0), 0) / template.exercises.length)
+                : 0
+              const estimatedDuration = template.exercises.reduce((acc, ex) => acc + (ex.restSec || 60) * ex.sets, 0) / 60 // in minutes
 
-      {sortedTemplates.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedTemplates.map((template, idx) => (
-            <motion.div
-              key={template.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: idx * 0.05 }}
-            >
-              <Card className="h-full flex flex-col group transition-all hover:border-primary/60 hover:shadow-lg">
-                <CardContent className="p-5 flex-grow">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-lg text-foreground pr-2">
-                      {template.name}
-                    </h3>
-                    <div className="flex items-center gap-1">
+              return (
+                <motion.div
+                  key={template.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: idx * 0.1 }}
+                  whileHover={{ y: -4 }}
+                  className="group"
+                >
+                  <Card className="h-full flex flex-col relative overflow-hidden bg-gradient-to-br from-card to-card/50 border-0 shadow-sm hover:shadow-xl transition-all duration-300">
+                    {/* Subtle gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                    <CardContent className="relative p-6 flex-grow space-y-4">
+                      {/* Header with title and quick actions */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-xl text-foreground group-hover:text-primary transition-colors truncate">
+                              {template.name}
+                            </h3>
+                            {favorites.has(template.id) && (
+                              <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Criado {new Date(template.created_at).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 ml-3">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-primary/10"
+                            onClick={() => toggleFavorite(template.id)}
+                          >
+                            <Heart className={`h-4 w-4 ${favorites.has(template.id) ? 'text-red-500 fill-current' : 'text-muted-foreground'}`} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10"
+                            onClick={() => duplicateTemplate(template.id)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => deleteTemplate(template.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Template Stats */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-muted/30 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Dumbbell className="w-3 h-3 text-primary" />
+                            <span className="text-lg font-bold text-foreground">{totalExercises}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Exercícios</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Layers className="w-3 h-3 text-primary" />
+                            <span className="text-lg font-bold text-foreground">{totalSets}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Séries</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Clock className="w-3 h-3 text-primary" />
+                            <span className="text-lg font-bold text-foreground">{Math.round(estimatedDuration)}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">min</p>
+                        </div>
+                      </div>
+
+                      {/* Additional Stats */}
+                      <div className="flex justify-between items-center text-sm text-muted-foreground">
+                        <span>Total: {totalReps} repetições</span>
+                        {avgWeight > 0 && (
+                          <span>Média: {avgWeight}kg</span>
+                        )}
+                      </div>
+
+                      {/* Exercise Preview */}
+                      {template.exercises.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-muted-foreground">Exercícios:</p>
+                          <div className="space-y-1 max-h-24 overflow-hidden">
+                            {template.exercises.slice(0, 3).map((exercise) => {
+                              const exerciseName = exercise.exerciseId
+                                ? exercises.find(e => e.id === exercise.exerciseId)?.name || 'Exercício'
+                                : 'Exercício'
+                              return (
+                                <div key={exercise.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <div className="w-2 h-2 bg-primary rounded-full" />
+                                  <span className="truncate">{exerciseName}</span>
+                                  <span className="text-xs text-muted-foreground/60">
+                                    {exercise.sets}×{exercise.reps}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                            {template.exercises.length > 3 && (
+                              <p className="text-xs text-muted-foreground pl-4">
+                                +{template.exercises.length - 3} mais
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+
+                    {/* Action Buttons */}
+                    <div className="relative p-4 pt-0 space-y-2">
+                      <Link to={`/templates/editor/${template.id}`} className="block">
+                        <Button
+                          variant="default"
+                          className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar Template
+                        </Button>
+                      </Link>
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() =>
-                          duplicateTemplate(
-                            template.id
-                          )
-                        }
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => startWorkoutFromTemplate(template.id)}
                       >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() =>
-                          deleteTemplate(template.id)
-                        }
-                      >
-                        <Trash2 className="h-4 w-4" />
+                        <Play className="mr-2 h-4 w-4" />
+                        Iniciar Treino
                       </Button>
                     </div>
-                  </div>
-                  <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Dumbbell className="w-4 h-4" />
-                      <span>
-                        {template.exercises.length}{' '}
-                        exercícios
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4" />
-                      <span>
-                        {template.exercises.reduce(
-                          (acc, ex) => acc + ex.sets,
-                          0
-                        )}{' '}
-                        séries totais
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      <span>
-                        Criado em{' '}
-                        {new Date(
-                          template.created_at
-                        ).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-                <div className=" p-3">
-                  <Link
-                    to={`/templates/editor/${template.id}`}
-                    className="w-full"
-                  >
-                    <Button
-                      variant="ghost"
-                      className="w-full"
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Editar Template
-                    </Button>
-                  </Link>
+                  </Card>
+                </motion.div>
+              )
+            })}
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-center"
+          >
+            <div className="relative mx-auto max-w-md">
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 rounded-3xl blur-3xl" />
+              <div className="relative bg-card/80 backdrop-blur-sm border border-border/50 rounded-2xl p-12 space-y-6">
+                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl flex items-center justify-center">
+                  <Dumbbell className="w-10 h-10 text-primary" />
                 </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center bg-card border border-stone-700 border-dashed rounded-lg p-12">
-          <h4 className="text-lg font-medium">
-            Nenhum template encontrado
-          </h4>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {query
-              ? `Nenhum resultado para "${query}".`
-              : 'Crie seu primeiro template para começar!'}
-          </p>
-        </div>
-      )}
 
-      {showImportModal && (
-        <ImportWorkoutModal
-          onClose={() => setShowImportModal(false)}
-          onImport={handleImportTemplates}
-        />
-      )}
+                <div className="space-y-2">
+                  <h3 className="text-xl font-semibold">
+                    {query ? 'Nenhum resultado encontrado' : 'Comece criando seu primeiro template'}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {query
+                      ? `Não encontramos templates para "${query}". Tente uma busca diferente ou crie um novo template.`
+                      : 'Crie templates personalizados para organizar seus treinos e acompanhar seu progresso.'}
+                  </p>
+                </div>
+
+                {!query && (
+                  <div className="space-y-3">
+                    <Button onClick={createNew} className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Criar Primeiro Template
+                    </Button>
+                    <Button variant="outline" onClick={() => setShowImportModal(true)} className="w-full">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Importar Templates
+                    </Button>
+                  </div>
+                )}
+
+                {query && (
+                  <Button variant="outline" onClick={() => setQuery('')} className="w-full">
+                    Limpar Busca
+                  </Button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {showImportModal && (
+          <ImportWorkoutModal
+            onClose={() => setShowImportModal(false)}
+            onImport={handleImportTemplates}
+          />
+        )}
+      </div>
     </div>
   )
 }

@@ -43,7 +43,7 @@ export default function TreinoPage() {
         <div className="container mx-auto p-4 md:p-6 space-y-8">
             {/* Hero: Próximo treino */}
             {nextWorkout ? (
-                <div className="relative overflow-hidden rounded-xl border border-stone-700 border-primary/20 bg-card p-6 md:p-8">
+                <div className="relative overflow-hidden rounded-xl border border-border bg-card p-6 md:p-8">
                     <div
                         aria-hidden="true"
                         className="pointer-events-none absolute inset-0 -z-10"
@@ -119,7 +119,7 @@ export default function TreinoPage() {
                                 key={template.id}
                                 className="group"
                             >
-                                <div className="h-full rounded-lg border border-stone-700 border-stone-600 bg-card p-5 transition-all hover:border-primary/60 hover:shadow-lg">
+                                <div className="h-full rounded-lg border border-border bg-card p-5 transition-all hover:border-primary/60 hover:shadow-lg">
                                     <h4 className="font-bold text-lg text-foreground">
                                         {template.name}
                                     </h4>

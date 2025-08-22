@@ -21,31 +21,42 @@ export default function HomePage() {
   }, [key, navigate, session])
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Iniciar Treino</h1>
+        <h1 className="text-heading-2">Iniciar Treino</h1>
         <Link to="/templates">
           <Button variant="outline">Gerenciar Templates</Button>
         </Link>
       </div>
-      <div className="grid gap-3">
+
+      <div className="space-y-4">
         {templates.length === 0 && (
-          <div className="surface p-4 text-sm text-muted-foreground">Crie um template para começar.</div>
+          <div className="surface p-8 text-center">
+            <p className="text-body text-muted-foreground mb-4">Crie um template para começar seus treinos</p>
+            <Link to="/templates">
+              <Button>Criar Primeiro Template</Button>
+            </Link>
+          </div>
         )}
+
         {templates.map((t) => (
-          <Card key={t.id}>
-            <CardContent className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">{t.name}</div>
-                <div className="text-xs text-muted-foreground">{t.exercises.length} exercícios</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link to={`/templates/editor/${t.id}`}>
-                  <Button variant="outline" size="sm">Editar</Button>
-                </Link>
-                <Link to={`/session/${t.id}`}>
-                  <Button size="sm">Iniciar</Button>
-                </Link>
+          <Card key={t.id} className="hover:bg-card/80 transition-colors">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-heading-3 font-medium">{t.name}</h3>
+                  <p className="text-body-small text-muted-foreground">
+                    {t.exercises.length} exercício{t.exercises.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Link to={`/templates/editor/${t.id}`}>
+                    <Button variant="outline" size="sm">Editar</Button>
+                  </Link>
+                  <Link to={`/session/${t.id}`}>
+                    <Button size="sm">Iniciar</Button>
+                  </Link>
+                </div>
               </div>
             </CardContent>
           </Card>
