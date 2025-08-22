@@ -11,8 +11,9 @@ import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { formatSeconds, getRandomFromRange } from '@/lib/utils'
 import { toast } from 'sonner'
-import { X, Plus, ChevronDown, Timer, Circle, CheckCircle2 } from 'lucide-react'
+import { X, Plus, Minus, ChevronDown, Timer, Circle, CheckCircle2 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { notificationUtils, audioUtils } from '@/lib/notifications'
 import { enqueueSet, registerSync } from '@/lib/offlineQueue'
 import { SessionSkeleton } from '@/components/skeletons'
 import { SwipeableSet } from '@/components/ui/swipeable-set'
@@ -32,11 +33,13 @@ export default function SessionPage() {
   const [expandedExerciseIndex, setExpandedExerciseIndex] = useState(0)
   const [completedExercises, setCompletedExercises] = useState<Set<number>>(new Set())
   const [exerciseStates, setExerciseStates] = useState<Record<string, ExerciseLocalState>>({})
+  const [activeRestTimers, setActiveRestTimers] = useState<Record<string, { remaining: number; total: number; intervalId?: number; notification?: Notification; wasInterrupted?: boolean }>>({})
   const exerciseRefs = useRef<Array<HTMLDivElement | null>>([])
   const timerRef = useRef<number | null>(null)
   const startedAtRef = useRef<number>(Date.now())
   const workoutIdRef = useRef<string>('')
   const performedExerciseIdsRef = useRef<string[]>([])
+  const restTimersRef = useRef<Record<string, { remaining: number; total: number; intervalId?: number; notification?: Notification; wasInterrupted?: boolean }>>({})
 
   // Initialize session
   useEffect(() => {
@@ -115,6 +118,15 @@ export default function SessionPage() {
         }
         exerciseRefs.current = Array.from({ length: tpl.exercises.length }, () => null)
 
+        // Request notification permission for rest timer notifications
+        if (notificationUtils.isSupported() && notificationUtils.getPermission() === 'default') {
+          notificationUtils.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              console.log('Notification permission granted for rest timer')
+            }
+          })
+        }
+
         // Timer will be started in a separate effect once template is ready
       } catch (e: any) {
         toast.error(e?.message || 'Erro ao iniciar sessão')
@@ -127,6 +139,19 @@ export default function SessionPage() {
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current)
       navigator.serviceWorker?.removeEventListener?.('message', onSwMessage as any)
+
+      // Clean up all active rest timers and notifications
+      Object.values(restTimersRef.current).forEach(timer => {
+        if (timer.intervalId) {
+          window.clearInterval(timer.intervalId)
+        }
+        if (timer.notification) {
+          timer.notification.close()
+        }
+      })
+
+      // Close any remaining rest timer notifications
+      notificationUtils.closeRestTimerNotifications()
     }
   }, [session, templateId])
 
@@ -229,6 +254,211 @@ export default function SessionPage() {
     })
   }
 
+  const startRestTimer = async (exerciseId: string, setId: number) => {
+    const exercise = template.exercises.find((te) => te.id === exerciseId)
+    const exerciseName = exercises.find((e) => e.id === exercise?.exerciseId)?.name || 'Exercício'
+    const restSec = typeof exercise?.restSec === 'number' ? exercise.restSec : parseInt(String(exercise?.restSec)) || 0
+    if (!restSec || restSec <= 0) return
+
+    const timerKey = `${exerciseId}-${setId}`
+    const totalSeconds = restSec
+
+    // Clear any existing timer for this set
+    if (activeRestTimers[timerKey]?.intervalId) {
+      window.clearInterval(activeRestTimers[timerKey].intervalId)
+    }
+
+    // Create notification for rest timer
+    const notification = await notificationUtils.sendRestTimerNotification(
+      exerciseName,
+      setId,
+      totalSeconds,
+      totalSeconds
+    )
+
+    const intervalId = window.setInterval(() => {
+      setActiveRestTimers((prev) => {
+        const timer = prev[timerKey]
+        if (!timer) return prev
+
+        const newRemaining = timer.remaining - 1
+
+        if (newRemaining <= 0) {
+          // Timer completed naturally (not interrupted)
+          window.clearInterval(intervalId)
+
+          // Only play alarm and show completion notification if timer wasn't interrupted
+          if (!timer.wasInterrupted) {
+            // Play alarm sound
+            audioUtils.playRestAlarm().catch(error => {
+              console.warn('Failed to play rest alarm:', error)
+            })
+
+            // Vibrate device for timer completion
+            const vibrationSuccess = audioUtils.vibrateForRestTimer()
+            if (vibrationSuccess) {
+              console.log('Rest timer vibration triggered')
+            }
+
+            // Send completion notification
+            notificationUtils.sendRestTimerCompleteNotification(exerciseName, setId)
+          }
+
+          // Close the ongoing notification
+          if (timer.notification) {
+            timer.notification.close()
+          }
+
+          const next = { ...prev }
+          delete next[timerKey]
+          delete restTimersRef.current[timerKey]
+          return next
+        }
+
+        // Update notification with new time (only if supported)
+        if (timer.notification && notificationUtils.isSupported() && notificationUtils.getPermission() === 'granted') {
+          // Create a new notification with updated content
+          const progress = Math.round(((totalSeconds - newRemaining) / totalSeconds) * 100)
+          const formatTime = (seconds: number): string => {
+            const mins = Math.floor(seconds / 60)
+            const secs = seconds % 60
+            return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`
+          }
+
+          // Close old notification
+          timer.notification.close()
+
+          // Create new notification with updated content
+          const updatedNotification = new Notification('⏱️ Descanso em Andamento', {
+            body: `${exerciseName} - Série ${setId}\n${formatTime(newRemaining)} restantes (${progress}%)`,
+            icon: '/icons/icon-192.png',
+            badge: '/icons/icon-192.png',
+            tag: 'rest-timer-notification',
+            requireInteraction: true,
+            silent: false
+          })
+
+          updatedNotification.onclick = () => {
+            window.focus()
+            updatedNotification.close()
+          }
+
+          // Update timer with new notification
+          timer.notification = updatedNotification
+        }
+
+        // Add warning vibration when timer reaches warning threshold (10 seconds or less)
+        if (newRemaining <= 10 && newRemaining > 0 && !timer.wasInterrupted) {
+          // Only vibrate once per warning threshold to avoid spam
+          const shouldWarn = newRemaining === 10 || (newRemaining <= 5 && newRemaining > 0)
+          if (shouldWarn) {
+            audioUtils.vibrateForTimerWarning()
+          }
+        }
+
+        return {
+          ...prev,
+          [timerKey]: { ...timer, remaining: newRemaining }
+        }
+      })
+    }, 1000)
+
+    const newTimer = {
+      remaining: totalSeconds,
+      total: totalSeconds,
+      intervalId,
+      notification: notification || undefined,
+      wasInterrupted: false
+    }
+
+    setActiveRestTimers((prev) => ({
+      ...prev,
+      [timerKey]: newTimer
+    }))
+
+    restTimersRef.current[timerKey] = newTimer
+  }
+
+  const stopRestTimer = (exerciseId: string, setId: number) => {
+    const timerKey = `${exerciseId}-${setId}`
+    const timer = activeRestTimers[timerKey]
+
+    if (timer?.intervalId) {
+      window.clearInterval(timer.intervalId)
+    }
+
+    // Close the notification
+    if (timer?.notification) {
+      timer.notification.close()
+    }
+
+    setActiveRestTimers((prev) => {
+      const next = { ...prev }
+      // Mark as interrupted instead of deleting immediately
+      if (next[timerKey]) {
+        next[timerKey].wasInterrupted = true
+      }
+      delete next[timerKey] // Still delete to clean up
+      return next
+    })
+
+    delete restTimersRef.current[timerKey]
+  }
+
+  const adjustRestTimer = (exerciseId: string, setId: number, adjustment: number) => {
+    const timerKey = `${exerciseId}-${setId}`
+
+    setActiveRestTimers((prev) => {
+      const next = { ...prev }
+      const timer = next[timerKey]
+      if (!timer) return prev
+
+      const newRemaining = Math.max(0, timer.remaining + adjustment)
+      const newTotal = Math.max(0, timer.total + adjustment)
+
+      // Update notification if it exists
+      if (timer.notification && notificationUtils.isSupported() && notificationUtils.getPermission() === 'granted') {
+        const exercise = template.exercises.find((te) => te.id === exerciseId)
+        const exerciseName = exercises.find((e) => e.id === exercise?.exerciseId)?.name || 'Exercício'
+
+        const progress = Math.round(((newTotal - newRemaining) / newTotal) * 100)
+        const formatTime = (seconds: number): string => {
+          const mins = Math.floor(seconds / 60)
+          const secs = seconds % 60
+          return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`
+        }
+
+        // Close old notification
+        timer.notification.close()
+
+        // Create new notification with updated content
+        const updatedNotification = new Notification('⏱️ Descanso em Andamento', {
+          body: `${exerciseName} - Série ${setId}\n${formatTime(newRemaining)} restantes (${progress}%)`,
+          icon: '/icons/icon-192.png',
+          badge: '/icons/icon-192.png',
+          tag: 'rest-timer-notification',
+          requireInteraction: true,
+          silent: false
+        })
+
+        updatedNotification.onclick = () => {
+          window.focus()
+          updatedNotification.close()
+        }
+
+        timer.notification = updatedNotification
+      }
+
+      next[timerKey] = {
+        ...timer,
+        remaining: newRemaining,
+        total: newTotal
+      }
+
+      return next
+    })
+  }
+
   const handleSetToggleComplete = (exerciseId: string, setId: number) => {
     let justCompleted = false
     setExerciseStates((prev) => {
@@ -244,7 +474,8 @@ export default function SessionPage() {
       next[exerciseId] = st
       return next
     })
-    // If toggled to completed, send performed set to backend using current values
+
+    // If toggled to completed, send performed set to backend and start rest timer
     if (justCompleted) {
       const teIndex = template.exercises.findIndex((te) => te.id === exerciseId)
       if (teIndex !== -1) {
@@ -254,8 +485,13 @@ export default function SessionPage() {
         // Load is optional, reps are required
         if (parsedReps > 0) {
           void handleSetComplete(teIndex, { load: parsedLoad, reps: parsedReps, kind: 'working' })
+          // Start rest timer after set completion
+          startRestTimer(exerciseId, setId)
         }
       }
+    } else {
+      // If unchecking completion, stop the rest timer
+      stopRestTimer(exerciseId, setId)
     }
   }
 
@@ -638,6 +874,123 @@ export default function SessionPage() {
           Adicionar Exercício
         </Button>
       </main>
+
+      {/* Rest Timer Display */}
+      {Object.keys(activeRestTimers).length > 0 && (
+        <div className="fixed bottom-20 left-4 right-4 z-40">
+          {Object.entries(activeRestTimers).map(([timerKey, timerData]) => {
+            const [exerciseId, setId] = timerKey.split('-')
+            const exercise = template.exercises.find((te) => te.id === exerciseId)
+            const exerciseName = exercises.find((e) => e.id === exercise?.exerciseId)?.name || 'Exercício'
+
+            const progress = ((timerData.total - timerData.remaining) / timerData.total) * 100
+            const isWarning = timerData.remaining <= 10
+
+            return (
+              <motion.div
+                key={timerKey}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-card/95 backdrop-blur-md border border-border/50 rounded-2xl p-4 shadow-lg mb-2"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Timer className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Descanso - {exerciseName}</p>
+                      <p className="text-xs text-muted-foreground">Série {setId}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      stopRestTimer(exerciseId, parseInt(setId))
+                    }}
+                    className="h-8 w-8 p-0 rounded-full hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-full hover:bg-primary/10 hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          adjustRestTimer(exerciseId, parseInt(setId), -10)
+                        }}
+                        disabled={timerData.remaining <= 10}
+                      >
+                        <Minus className="w-4 h-4" />
+                      </Button>
+                      <div className={`text-2xl font-bold tabular-nums ${isWarning ? 'text-orange-500' : 'text-primary'}`}>
+                        {formatSeconds(timerData.remaining)}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-full hover:bg-primary/10 hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          adjustRestTimer(exerciseId, parseInt(setId), 10)
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      de {formatSeconds(timerData.total)}
+                    </div>
+                  </div>
+
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-1000 ${isWarning ? 'bg-orange-500' : 'bg-primary'
+                        }`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs hover:bg-primary/10 hover:text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        adjustRestTimer(exerciseId, parseInt(setId), -30)
+                      }}
+                      disabled={timerData.remaining <= 30}
+                    >
+                      -30s
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs hover:bg-primary/10 hover:text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        adjustRestTimer(exerciseId, parseInt(setId), 30)
+                      }}
+                    >
+                      +30s
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Bottom Action */}
       {allSetsForCurrentExerciseCompleted && (

@@ -1,6 +1,7 @@
 import { Dumbbell, LayoutGrid, History } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useScrollDirection } from '@/hooks/useScrollDirection'
+import { useState, useEffect } from 'react'
 
 const tabs = [
     { path: '/treino', label: 'Treino', icon: Dumbbell },
@@ -11,8 +12,21 @@ const tabs = [
 export function BottomTabBar() {
     const location = useLocation()
     const { scrollDirection } = useScrollDirection()
+    const [isAtTop, setIsAtTop] = useState(true)
 
     const isSessionPage = location.pathname.includes('/session/')
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsAtTop(window.scrollY === 0)
+        }
+
+        // Set initial state
+        handleScroll()
+
+        window.addEventListener('scroll', handleScroll)
+        return () => window.removeEventListener('scroll', handleScroll)
+    }, [])
 
     if (isSessionPage) {
         return null
@@ -20,9 +34,9 @@ export function BottomTabBar() {
 
     return (
         <nav
-            className={`fixed bottom-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-md border-t border-border transition-transform duration-300 md:hidden ${scrollDirection === 'down'
-                ? 'translate-y-full'
-                : 'translate-y-0'
+            className={`fixed bottom-0 left-0 right-0 z-10 bg-background/95 backdrop-blur-md border-t border-border transition-transform duration-300 md:hidden ${isAtTop || scrollDirection !== 'down'
+                ? 'translate-y-0'
+                : 'translate-y-full'
                 }`}
         >
             <div className="flex justify-around items-center h-16 px-2 safe-padded">

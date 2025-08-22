@@ -1,0 +1,27 @@
+ALARM.MP3 INSTRUCTIONS
+========================
+
+To add a custom alarm sound for rest timer completion:
+
+1. Add your alarm.mp3 file to the /public folder
+2. Name it exactly "alarm.mp3"
+3. The file should be:
+   - MP3 format
+   - Short duration (3-5 seconds recommended)
+   - Clear and audible
+   - Not too loud (the app will play it at 80% volume)
+
+Example:
+- Place your alarm.mp3 file in: /public/alarm.mp3
+- The app will automatically detect and use it
+- If no custom file is found, a built-in beep will be used
+
+Testing:
+- The app includes a fallback beep sound using Web Audio API
+- You can test the current alarm by completing a set with rest timer
+- Check browser console for any audio-related warnings
+
+iOS Notes:
+- Audio will only play if triggered by user interaction
+- First rest timer completion may require user interaction
+- iOS Safari has restrictions on autoplay audio
