@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import type { PanInfo } from 'framer-motion'
 import { Input } from '@/components/ui/input'
@@ -29,47 +29,100 @@ export const SwipeableSet: React.FC<SwipeableSetProps> = ({
 }) => {
     const [dragOffset, setDragOffset] = useState(0)
     const [isDragging, setIsDragging] = useState(false)
+    const [showActions, setShowActions] = useState(false)
+
     const constraintsRef = useRef<HTMLDivElement>(null)
-    const SWIPE_THRESHOLD = 60 // pixels to trigger action
+    const SWIPE_THRESHOLD = 40 // pixels to show action buttons
     const MAX_SWIPE = 80 // maximum swipe distance
+
+    // Detect if we're on a mobile device
+    const isMobile = typeof window !== 'undefined' &&
+        ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
     const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, _info: PanInfo) => {
         setIsDragging(false)
 
-        // Check if swipe passed threshold
+        // Check if swipe passed threshold to show actions
         if (Math.abs(dragOffset) > SWIPE_THRESHOLD) {
-            if (dragOffset > 0) {
-                // Swiped right - delete action
-                onDelete()
-            } else {
-                // Swiped left - duplicate action
-                onDuplicate()
-            }
-            // Reset position after action
-            setDragOffset(0)
+            setShowActions(true)
+            // Auto-hide actions after 3 seconds if no action is taken
+            setTimeout(() => {
+                setShowActions(false)
+                setDragOffset(0)
+            }, 3000)
         } else {
             // Return to original position
             setDragOffset(0)
+            setShowActions(false)
         }
     }
 
-    const handleDrag = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-        const newOffset = Math.max(-MAX_SWIPE, Math.min(MAX_SWIPE, info.offset.x))
-        setDragOffset(newOffset)
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        onDelete()
+        setShowActions(false)
+        setDragOffset(0)
     }
+
+    const handleDuplicateClick = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        onDuplicate()
+        setShowActions(false)
+        setDragOffset(0)
+    }
+
+    const handleHideActions = () => {
+        setShowActions(false)
+        setDragOffset(0)
+    }
+
+    const handleDrag = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+        // Improve drag handling for mobile
+        const newOffset = Math.max(-MAX_SWIPE, Math.min(MAX_SWIPE, info.offset.x))
+
+        // Add some resistance at the edges
+        if (Math.abs(newOffset) === MAX_SWIPE) {
+            setDragOffset(newOffset * 0.95) // Reduce resistance at max
+        } else {
+            setDragOffset(newOffset)
+        }
+    }
+
+    const handleDragStart = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, _info: PanInfo) => {
+        setIsDragging(true)
+    }, [])
 
     const opacity = Math.min(Math.abs(dragOffset) / SWIPE_THRESHOLD, 1)
 
     return (
         <div className="relative overflow-hidden" ref={constraintsRef}>
+            {/* Overlay to close actions when clicking outside */}
+            {showActions && (
+                <div
+                    className="absolute inset-0 z-20"
+                    onClick={handleHideActions}
+                />
+            )}
             {/* Action backgrounds */}
-            <div className="absolute inset-0 flex">
+            <div className={`absolute inset-0 flex ${showActions ? "z-30" : "z-10"}`}>
                 {/* Left side - Delete action */}
                 <div
-                    className="flex items-center justify-center w-16 bg-destructive/10 text-destructive transition-all duration-200"
-                    style={{ opacity: dragOffset > 0 ? opacity : 0 }}
+                    className={`flex items-center justify-center w-16 transition-all duration-200 ${showActions && dragOffset > 0
+                            ? 'bg-destructive/20 text-destructive'
+                            : 'bg-destructive/10 text-destructive'
+                        }`}
+                    style={{ opacity: (dragOffset > 0 || (showActions && dragOffset > 0)) ? (showActions ? 1 : opacity) : 0 }}
                 >
-                    <Trash2 className="w-4 h-4" />
+                    {showActions && dragOffset > 0 ? (
+                        <button
+                            onClick={handleDeleteClick}
+                            className="w-full h-full flex items-center justify-center hover:bg-destructive/30 rounded-full transition-colors"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
+                    ) : (
+                        <Trash2 className="w-4 h-4" />
+                    )}
                 </div>
 
                 {/* Spacer to keep main content visible */}
@@ -77,10 +130,22 @@ export const SwipeableSet: React.FC<SwipeableSetProps> = ({
 
                 {/* Right side - Duplicate action */}
                 <div
-                    className="flex items-center justify-center w-16 bg-green-500/10 text-green-600 transition-all duration-200"
-                    style={{ opacity: dragOffset < 0 ? opacity : 0 }}
+                    className={`flex items-center justify-center w-16 transition-all duration-200 ${showActions && dragOffset < 0
+                            ? 'bg-green-500/20 text-green-600'
+                            : 'bg-green-500/10 text-green-600'
+                        }`}
+                    style={{ opacity: (dragOffset < 0 || (showActions && dragOffset < 0)) ? (showActions ? 1 : opacity) : 0 }}
                 >
-                    <Plus className="w-4 h-4" />
+                    {showActions && dragOffset < 0 ? (
+                        <button
+                            onClick={handleDuplicateClick}
+                            className="w-full h-full flex items-center justify-center hover:bg-green-500/30 rounded-full transition-colors"
+                        >
+                            <Plus className="w-5 h-5" />
+                        </button>
+                    ) : (
+                        <Plus className="w-4 h-4" />
+                    )}
                 </div>
             </div>
 
@@ -88,24 +153,34 @@ export const SwipeableSet: React.FC<SwipeableSetProps> = ({
             <motion.div
                 drag="x"
                 dragConstraints={{ left: -MAX_SWIPE, right: MAX_SWIPE }}
-                dragElastic={0.2}
-                onDragStart={() => setIsDragging(true)}
+                dragElastic={isMobile ? 0.05 : 0.1} // Much less elasticity on mobile
+                onDragStart={handleDragStart}
                 onDrag={handleDrag}
                 onDragEnd={handleDragEnd}
                 animate={{ x: dragOffset }}
                 transition={{
                     type: "spring",
-                    stiffness: 400,
-                    damping: 40,
-                    opacity: { duration: 0.15 }
+                    stiffness: isMobile ? 250 : 300, // Even less stiffness on mobile
+                    damping: isMobile ? 30 : 35,    // More damping on mobile for stability
+                    opacity: { duration: isMobile ? 0.15 : 0.2 }
                 }}
                 className={cn(
-                    "relative z-10 grid grid-cols-4 gap-3 items-center p-3 rounded-xl transition-colors bg-card",
+                    `relative transition-colors bg-card`,
+                    showActions ? "z-30" : "z-10",
+                    "grid grid-cols-4 gap-3 items-center p-3 rounded-xl",
                     isCompleted ? "bg-primary/5" : "bg-muted/30"
                 )}
                 style={{
-                    boxShadow: isDragging ? '0 2px 8px rgba(0, 0, 0, 0.08)' : undefined,
+                    boxShadow: isDragging ? '0 4px 12px rgba(0, 0, 0, 0.12)' : undefined,
+                    touchAction: 'pan-y pinch-zoom', // Allow vertical scrolling while preventing horizontal scroll conflicts
+                    // Improve touch responsiveness on mobile
+                    WebkitTapHighlightColor: 'transparent',
                 }}
+                // Improve touch handling
+                dragMomentum={false} // Disable momentum for more controlled mobile interaction
+                // Better drag detection for mobile
+                dragDirectionLock={true} // Lock to horizontal dragging
+                dragPropagation={false} // Prevent drag events from bubbling up
             >
                 <div className="text-center">
                     <div className={cn(
