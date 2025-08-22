@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useMotionValue, useTransform, useVelocity } from 'framer-motion'
 import type { PanInfo } from 'framer-motion'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -27,72 +27,95 @@ export const SwipeableSet: React.FC<SwipeableSetProps> = ({
     onDelete,
     onDuplicate,
 }) => {
-    const [dragOffset, setDragOffset] = useState(0)
-    const [isDragging, setIsDragging] = useState(false)
     const [showActions, setShowActions] = useState(false)
+    const [isDragging, setIsDragging] = useState(false)
+
+    // Use motion values for better performance
+    const x = useMotionValue(0)
+    const velocity = useVelocity(x)
 
     const constraintsRef = useRef<HTMLDivElement>(null)
     const SWIPE_THRESHOLD = 40 // pixels to show action buttons
     const MAX_SWIPE = 80 // maximum swipe distance
+    const VELOCITY_THRESHOLD = 500 // pixels per second for quick actions
 
     // Detect if we're on a mobile device
     const isMobile = typeof window !== 'undefined' &&
         ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
-    const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, _info: PanInfo) => {
+    // Transform motion values for better visual feedback
+    const deleteOpacity = useTransform(x, [0, SWIPE_THRESHOLD], [0, 1])
+    const deleteScale = useTransform(x, [0, SWIPE_THRESHOLD], [0.8, 1.1])
+    const duplicateOpacity = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0])
+    const duplicateScale = useTransform(x, [-SWIPE_THRESHOLD, 0], [1.1, 0.8])
+
+    const handleDragEnd = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, _info: PanInfo) => {
         setIsDragging(false)
 
-        // Check if swipe passed threshold to show actions
-        if (Math.abs(dragOffset) > SWIPE_THRESHOLD) {
-            setShowActions(true)
-            // Auto-hide actions after 3 seconds if no action is taken
-            setTimeout(() => {
+        const currentX = x.get()
+        const currentVelocity = Math.abs(velocity.get())
+
+        // Quick, decisive swipe (high velocity) - execute action immediately
+        if (currentVelocity > VELOCITY_THRESHOLD) {
+            if (currentX > SWIPE_THRESHOLD) {
+                // Quick swipe right - delete immediately
+                onDelete()
+                x.set(0)
                 setShowActions(false)
-                setDragOffset(0)
-            }, 3000)
+                return
+            } else if (currentX < -SWIPE_THRESHOLD) {
+                // Quick swipe left - duplicate immediately
+                onDuplicate()
+                x.set(0)
+                setShowActions(false)
+                return
+            }
+        }
+
+        // Slow drag - show action buttons
+        if (Math.abs(currentX) > SWIPE_THRESHOLD) {
+            setShowActions(true)
+            // Add haptic feedback on mobile
+            if (isMobile && 'vibrate' in navigator) {
+                navigator.vibrate(50)
+            }
         } else {
             // Return to original position
-            setDragOffset(0)
+            x.set(0)
             setShowActions(false)
         }
-    }
+    }, [x, velocity, VELOCITY_THRESHOLD, SWIPE_THRESHOLD, onDelete, onDuplicate, isMobile])
 
-    const handleDeleteClick = (e: React.MouseEvent) => {
+    const handleDeleteClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation()
         onDelete()
         setShowActions(false)
-        setDragOffset(0)
-    }
+        x.set(0)
+    }, [onDelete, x])
 
-    const handleDuplicateClick = (e: React.MouseEvent) => {
+    const handleDuplicateClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation()
         onDuplicate()
         setShowActions(false)
-        setDragOffset(0)
-    }
+        x.set(0)
+    }, [onDuplicate, x])
 
-    const handleHideActions = () => {
+    const handleHideActions = useCallback(() => {
         setShowActions(false)
-        setDragOffset(0)
-    }
+        x.set(0)
+    }, [x])
 
-    const handleDrag = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-        // Improve drag handling for mobile
-        const newOffset = Math.max(-MAX_SWIPE, Math.min(MAX_SWIPE, info.offset.x))
-
-        // Add some resistance at the edges
-        if (Math.abs(newOffset) === MAX_SWIPE) {
-            setDragOffset(newOffset * 0.95) // Reduce resistance at max
-        } else {
-            setDragOffset(newOffset)
-        }
-    }
+    const handleDrag = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+        // Update motion value directly for better performance
+        x.set(Math.max(-MAX_SWIPE, Math.min(MAX_SWIPE, info.offset.x)))
+    }, [x, MAX_SWIPE])
 
     const handleDragStart = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, _info: PanInfo) => {
         setIsDragging(true)
     }, [])
 
-    const opacity = Math.min(Math.abs(dragOffset) / SWIPE_THRESHOLD, 1)
+    // Calculate current x position
+    const currentX = x.get()
 
     return (
         <div className="relative overflow-hidden" ref={constraintsRef}>
@@ -106,47 +129,57 @@ export const SwipeableSet: React.FC<SwipeableSetProps> = ({
             {/* Action backgrounds */}
             <div className={`absolute inset-0 flex ${showActions ? "z-30" : "z-10"}`}>
                 {/* Left side - Delete action */}
-                <div
-                    className={`flex items-center justify-center w-16 transition-all duration-200 ${showActions && dragOffset > 0
+                <motion.div
+                    className={`flex items-center justify-center w-16 transition-all duration-200 ${showActions && currentX > 0
                             ? 'bg-destructive/20 text-destructive'
                             : 'bg-destructive/10 text-destructive'
                         }`}
-                    style={{ opacity: (dragOffset > 0 || (showActions && dragOffset > 0)) ? (showActions ? 1 : opacity) : 0 }}
+                    style={{
+                        opacity: showActions && currentX > 0 ? 1 : deleteOpacity,
+                        scale: showActions && currentX > 0 ? 1 : deleteScale
+                    }}
                 >
-                    {showActions && dragOffset > 0 ? (
-                        <button
+                    {showActions && currentX > 0 ? (
+                        <motion.button
                             onClick={handleDeleteClick}
                             className="w-full h-full flex items-center justify-center hover:bg-destructive/30 rounded-full transition-colors"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                         >
                             <Trash2 className="w-5 h-5" />
-                        </button>
+                        </motion.button>
                     ) : (
                         <Trash2 className="w-4 h-4" />
                     )}
-                </div>
+                </motion.div>
 
                 {/* Spacer to keep main content visible */}
                 <div className="flex-1" />
 
                 {/* Right side - Duplicate action */}
-                <div
-                    className={`flex items-center justify-center w-16 transition-all duration-200 ${showActions && dragOffset < 0
+                <motion.div
+                    className={`flex items-center justify-center w-16 transition-all duration-200 ${showActions && currentX < 0
                             ? 'bg-green-500/20 text-green-600'
                             : 'bg-green-500/10 text-green-600'
                         }`}
-                    style={{ opacity: (dragOffset < 0 || (showActions && dragOffset < 0)) ? (showActions ? 1 : opacity) : 0 }}
+                    style={{
+                        opacity: showActions && currentX < 0 ? 1 : duplicateOpacity,
+                        scale: showActions && currentX < 0 ? 1 : duplicateScale
+                    }}
                 >
-                    {showActions && dragOffset < 0 ? (
-                        <button
+                    {showActions && currentX < 0 ? (
+                        <motion.button
                             onClick={handleDuplicateClick}
                             className="w-full h-full flex items-center justify-center hover:bg-green-500/30 rounded-full transition-colors"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
                         >
                             <Plus className="w-5 h-5" />
-                        </button>
+                        </motion.button>
                     ) : (
                         <Plus className="w-4 h-4" />
                     )}
-                </div>
+                </motion.div>
             </div>
 
             {/* Swipeable content */}
@@ -157,7 +190,13 @@ export const SwipeableSet: React.FC<SwipeableSetProps> = ({
                 onDragStart={handleDragStart}
                 onDrag={handleDrag}
                 onDragEnd={handleDragEnd}
-                animate={{ x: dragOffset }}
+                style={{
+                    x,
+                    boxShadow: isDragging ? '0 4px 12px rgba(0, 0, 0, 0.15)' : undefined,
+                    touchAction: 'pan-y pinch-zoom', // Allow vertical scrolling while preventing horizontal scroll conflicts
+                    // Improve touch responsiveness on mobile
+                    WebkitTapHighlightColor: 'transparent',
+                }}
                 transition={{
                     type: "spring",
                     stiffness: isMobile ? 250 : 300, // Even less stiffness on mobile
@@ -170,12 +209,6 @@ export const SwipeableSet: React.FC<SwipeableSetProps> = ({
                     "grid grid-cols-4 gap-3 items-center p-3 rounded-xl",
                     isCompleted ? "bg-primary/5" : "bg-muted/30"
                 )}
-                style={{
-                    boxShadow: isDragging ? '0 4px 12px rgba(0, 0, 0, 0.12)' : undefined,
-                    touchAction: 'pan-y pinch-zoom', // Allow vertical scrolling while preventing horizontal scroll conflicts
-                    // Improve touch responsiveness on mobile
-                    WebkitTapHighlightColor: 'transparent',
-                }}
                 // Improve touch handling
                 dragMomentum={false} // Disable momentum for more controlled mobile interaction
                 // Better drag detection for mobile
