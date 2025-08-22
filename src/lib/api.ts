@@ -426,6 +426,10 @@ export const api = {
         const importedTemplates: WorkoutTemplate[] = []
         const createdExercises: string[] = []
 
+        // Get current user
+        const { data: user } = await supabase.auth.getUser()
+        if (!user?.user) throw new Error('User not authenticated')
+
         for (const template of templates) {
             try {
                 // Create exercises first (if they don't exist)
@@ -439,6 +443,7 @@ export const api = {
                     const { data: existingExercise } = await supabase
                         .from('exercises')
                         .select('id')
+                        .eq('user_id', user.user.id)
                         .eq('name', exerciseData.exerciseName)
                         .eq('muscle_group', exerciseData.muscleGroup)
                         .single()
@@ -447,10 +452,11 @@ export const api = {
                     if (existingExercise) {
                         exerciseId = existingExercise.id
                     } else {
-                        // Create new exercise
+                        // Create new exercise with user_id
                         const { data: newExercise, error: exerciseError } = await supabase
                             .from('exercises')
                             .insert({
+                                user_id: user.user.id,
                                 name: exerciseData.exerciseName,
                                 muscle_group: exerciseData.muscleGroup
                             })
@@ -470,17 +476,21 @@ export const api = {
                     exerciseIds.push(exerciseId)
                 }
 
-                // Create the template
+                // Create the template with user_id
                 const { data: newTemplate, error: templateError } = await supabase
                     .from('templates')
-                    .insert({ name: template.name })
+                    .insert({
+                        user_id: user.user.id,
+                        name: template.name
+                    })
                     .select('*')
                     .single()
 
                 if (templateError) throw templateError
 
-                // Create template exercises
+                // Create template exercises with user_id
                 const templateExercises = template.exercises.map((exercise, idx) => ({
+                    user_id: user.user.id,
                     template_id: newTemplate.id,
                     exercise_id: exerciseIds[idx],
                     position: idx,
@@ -496,28 +506,36 @@ export const api = {
 
                 if (exercisesError) throw exercisesError
 
-                // Create the complete template object
-                const completeTemplate: WorkoutTemplate = {
-                    id: newTemplate.id,
-                    name: newTemplate.name,
-                    created_at: newTemplate.created_at,
-                    exercises: template.exercises.map((exercise, idx) => ({
-                        id: '', // We'll generate a temp ID
-                        exerciseId: exerciseIds[idx],
-                        sets: exercise.sets,
-                        reps: exercise.reps,
-                        load: exercise.load,
-                        restSec: exercise.restSec,
-                    }))
+                // Fetch the complete template with exercises from database to ensure consistency
+                const completeTemplate = await api.getTemplate(newTemplate.id)
+                if (completeTemplate) {
+                    importedTemplates.push(completeTemplate)
+                } else {
+                    // Fallback: create template object with the data we have
+                    const fallbackTemplate: WorkoutTemplate = {
+                        id: newTemplate.id,
+                        name: newTemplate.name,
+                        created_at: newTemplate.created_at,
+                        exercises: template.exercises.map((exercise, idx) => ({
+                            id: '', // We'll generate a temp ID
+                            exerciseId: exerciseIds[idx],
+                            sets: exercise.sets,
+                            reps: exercise.reps,
+                            load: exercise.load,
+                            restSec: exercise.restSec,
+                        }))
+                    }
+                    importedTemplates.push(fallbackTemplate)
                 }
-
-                importedTemplates.push(completeTemplate)
 
             } catch (error) {
                 console.error(`Error importing template "${template.name}":`, error)
                 throw error
             }
         }
+
+        // Small delay to ensure data is properly persisted before returning
+        await new Promise(resolve => setTimeout(resolve, 100))
 
         return { templates: importedTemplates, createdExercises }
     },

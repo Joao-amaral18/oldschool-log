@@ -305,7 +305,7 @@ export default function TemplateEditorPage() {
               template.exercises.length === 0 ||
               template.exercises.some((e) => !e.exerciseId || (setRowsByExercise[e.id]?.length === 0))
             }
-            className="glow"
+            className=""
           >
             Salvar
           </Button>

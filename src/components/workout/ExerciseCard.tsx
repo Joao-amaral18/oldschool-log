@@ -152,18 +152,19 @@ export function ExerciseCard({
         <motion.div
             ref={cardRef}
             layout
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
             className="w-full"
         >
             <Card
                 className={cn(
-                    "liquid-card liquid-morph cursor-pointer",
+                    "cursor-pointer transition-all duration-200 hover-lift",
                     isCompleted
-                        ? "border-zinc-500/30 bg-accent/20 liquid-pulse"
+                        ? "border-muted bg-accent/10"
                         : isExpanded
-                            ? "liquid-glass-enhanced border-zinc-500/40"
-                            : "hover:border-zinc-500/30 hover:bg-accent/60"
+                            ? "border-muted/60"
+                            : "hover:border-muted/40 hover:bg-accent/30"
                 )}
                 onClick={!isExpanded ? onToggleExpand : undefined}
             >
@@ -215,7 +216,7 @@ export function ExerciseCard({
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: 'auto', opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.3 }}
+                                transition={{ duration: 0.2, ease: 'easeOut' }}
                                 className="overflow-hidden"
                             >
                                 <div className="space-y-4 pt-2">
@@ -224,7 +225,7 @@ export function ExerciseCard({
                                         {performedSets.map((set, idx) => (
                                             <div
                                                 key={set.id}
-                                                className="flex items-center justify-between rounded-lg border border-stone-700 border-muted bg-muted/30 px-3 py-2 opacity-70"
+                                                className="flex items-center justify-between rounded-lg border border-muted bg-muted/30 px-3 py-2 opacity-70"
                                             >
                                                 <div className="text-sm text-muted-foreground">
                                                     <span className="font-medium">Set {idx + 1}:</span> {set.load}kg × {set.reps} reps
@@ -238,9 +239,10 @@ export function ExerciseCard({
                                     {/* Rest Time Selection */}
                                     {showRestOptions && (
                                         <motion.div
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            className="rounded-md border border-stone-700 border-primary/20 bg-primary/5 p-3"
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.15 }}
+                                            className="rounded-md border border-muted/30 bg-primary/5 p-3"
                                         >
                                             <div className="text-sm font-medium text-primary mb-2">Escolher tempo de descanso:</div>
                                             <div className="flex gap-2">
@@ -273,9 +275,10 @@ export function ExerciseCard({
                                     {/* Rest Timer */}
                                     {restRemaining > 0 && (
                                         <motion.div
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            className="flex items-center justify-between rounded-md border border-stone-700 border-primary/20 bg-primary/5 p-3 text-sm"
+                                            initial={{ opacity: 0, y: -5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.15 }}
+                                            className="flex items-center justify-between rounded-md border border-muted/30 bg-primary/5 p-3 text-sm"
                                         >
                                             <div>Descanso: {formatSeconds(restRemaining)}</div>
                                             <Button size="sm" variant="outline" onClick={() => setRestRemaining(0)} className="border-primary text-primary">
@@ -286,7 +289,7 @@ export function ExerciseCard({
 
                                     {/* Active Set or Exercise Complete */}
                                     {!allSetsCompleted ? (
-                                        <div className="space-y-3 liquid-adaptive p-4">
+                                        <div className="space-y-3 p-4">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-sm font-medium">Set {completedSets + 1}</span>
                                                 <select
@@ -306,7 +309,7 @@ export function ExerciseCard({
                                                         type="number"
                                                         value={activeLoad}
                                                         onChange={(e) => setActiveLoad(Number(e.target.value))}
-                                                        className="h-12"
+                                                        className="h-12 focus-ring"
                                                     />
                                                 </div>
                                                 <div>
@@ -315,14 +318,14 @@ export function ExerciseCard({
                                                         type="number"
                                                         value={activeReps}
                                                         onChange={(e) => setActiveReps(Number(e.target.value))}
-                                                        className="h-12"
+                                                        className="h-12 focus-ring"
                                                     />
                                                 </div>
                                             </div>
 
                                             <Button
                                                 onClick={handleSetComplete}
-                                                className="w-full h-12"
+                                                className="w-full h-12 hover-scale"
                                                 disabled={!activeReps || toNumber(activeReps) <= 0 || (activeLoad !== undefined && activeLoad !== null && activeLoad < 0)}
                                             >
                                                 <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -338,7 +341,7 @@ export function ExerciseCard({
                                             </div>
                                             <Button
                                                 onClick={onExerciseComplete}
-                                                className="w-full h-12 glow"
+                                                className="w-full h-12 hover-scale"
                                                 variant="default"
                                             >
                                                 Finalizar Exercício
@@ -350,7 +353,7 @@ export function ExerciseCard({
                                     {!allSetsCompleted && (
                                         <div className="space-y-2">
                                             {Array.from({ length: Math.max(0, plannedSets - completedSets - 1) }, (_, idx) => (
-                                                <div key={idx} className="flex items-center justify-between rounded-lg border border-stone-700 border-muted/50 bg-muted/10 px-3 py-2 opacity-50">
+                                                <div key={idx} className="flex items-center justify-between rounded-lg border border-muted/50 bg-muted/10 px-3 py-2 opacity-50">
                                                     <div className="text-sm text-muted-foreground">
                                                         Set {completedSets + 2 + idx}
                                                     </div>

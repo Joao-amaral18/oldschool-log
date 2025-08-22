@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import type { WorkoutTemplate } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Pencil, Copy, Trash2, Search, Layers, Dumbbell, Clock, Plus, Upload, Play, Heart, Star, Filter } from 'lucide-react'
+import { Pencil, Copy, Trash2, Search, Layers, Dumbbell, Clock, Plus, Upload, Play, Heart, Star, Filter, ChevronDown, ChevronUp } from 'lucide-react'
 import { api, fetchWorkoutTemplates } from '@/lib/api'
 import { toNumber } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -24,6 +24,7 @@ export default function TemplatesPage() {
   const [sort, setSort] = useState<'recent' | 'name' | 'favorites'>('recent')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showImportModal, setShowImportModal] = useState(false)
+  const [expandedPreviews, setExpandedPreviews] = useState<Set<string>>(new Set())
   const modal = useModal()
 
   const load = async () => {
@@ -99,8 +100,6 @@ export default function TemplatesPage() {
       const result = await api.importWorkoutTemplates(importedTemplates)
       const { templates: newTemplates, createdExercises } = result
 
-      setTemplates((prev) => [...newTemplates, ...prev])
-
       // Show success message with details about created exercises
       let successMessage = `${newTemplates.length} template(s) importado(s) com sucesso!`
       if (createdExercises.length > 0) {
@@ -109,7 +108,7 @@ export default function TemplatesPage() {
 
       toast.success(successMessage)
 
-      // Refresh templates list to get updated exercise IDs
+      // Refresh the entire page data to ensure exercises are loaded correctly
       await load()
     } catch (e: any) {
       throw new Error(e?.message || 'Erro ao importar templates')
@@ -147,6 +146,16 @@ export default function TemplatesPage() {
     localStorage.setItem(`template-favorites-${session.userId}`, JSON.stringify([...newFavorites]))
   }
 
+  const togglePreviewExpanded = (templateId: string) => {
+    const newExpanded = new Set(expandedPreviews)
+    if (newExpanded.has(templateId)) {
+      newExpanded.delete(templateId)
+    } else {
+      newExpanded.add(templateId)
+    }
+    setExpandedPreviews(newExpanded)
+  }
+
   const sortedTemplates = useMemo(() => {
     const filtered = templates.filter((t) =>
       t.name.toLowerCase().includes(query.toLowerCase())
@@ -179,8 +188,9 @@ export default function TemplatesPage() {
       <div className="container mx-auto p-4 md:p-6 space-y-8">
         {/* Header Section */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
           className="relative"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-3xl blur-3xl" />
@@ -208,9 +218,9 @@ export default function TemplatesPage() {
 
         {/* Search and Filter Section */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={{ delay: 0.05, duration: 0.2 }}
           className="flex flex-col md:flex-row gap-4 items-start md:items-center"
         >
           <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full md:w-auto">
@@ -247,7 +257,7 @@ export default function TemplatesPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.1 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
             {sortedTemplates.map((template, idx) => {
@@ -262,15 +272,14 @@ export default function TemplatesPage() {
               return (
                 <motion.div
                   key={template.id}
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: idx * 0.1 }}
-                  whileHover={{ y: -4 }}
+                  transition={{ duration: 0.3, delay: Math.min(idx * 0.05, 0.3) }}
                   className="group"
                 >
-                  <Card className="h-full flex flex-col relative overflow-hidden bg-gradient-to-br from-card to-card/50 border-0 shadow-sm hover:shadow-xl transition-all duration-300">
+                  <Card className="h-full flex flex-col relative overflow-hidden bg-gradient-to-br from-card to-card/50 border-0 shadow-sm hover:shadow-lg transition-all duration-200 hover-lift">
                     {/* Subtle gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
                     <CardContent className="relative p-6 flex-grow space-y-4">
                       {/* Header with title and quick actions */}
@@ -352,9 +361,31 @@ export default function TemplatesPage() {
                       {/* Exercise Preview */}
                       {template.exercises.length > 0 && (
                         <div className="space-y-2">
-                          <p className="text-sm font-medium text-muted-foreground">Exercícios:</p>
-                          <div className="space-y-1 max-h-24 overflow-hidden">
-                            {template.exercises.slice(0, 3).map((exercise) => {
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-muted-foreground">Exercícios:</p>
+                            {template.exercises.length > 3 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs hover:bg-primary/10"
+                                onClick={() => togglePreviewExpanded(template.id)}
+                              >
+                                {expandedPreviews.has(template.id) ? (
+                                  <>
+                                    <ChevronUp className="h-3 w-3 mr-1" />
+                                    Recolher
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="h-3 w-3 mr-1" />
+                                    Ver Todos ({template.exercises.length})
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                          <div className={`space-y-1 ${expandedPreviews.has(template.id) ? 'max-h-40' : 'max-h-24'} overflow-hidden transition-all duration-200`}>
+                            {(expandedPreviews.has(template.id) ? template.exercises : template.exercises.slice(0, 3)).map((exercise) => {
                               const exerciseName = exercise.exerciseId
                                 ? exercises.find(e => e.id === exercise.exerciseId)?.name || 'Exercício'
                                 : 'Exercício'
@@ -368,10 +399,12 @@ export default function TemplatesPage() {
                                 </div>
                               )
                             })}
-                            {template.exercises.length > 3 && (
-                              <p className="text-xs text-muted-foreground pl-4">
-                                +{template.exercises.length - 3} mais
-                              </p>
+                            {!expandedPreviews.has(template.id) && template.exercises.length > 3 && (
+                              <div className="pt-1 border-t border-border/50">
+                                <p className="text-xs text-muted-foreground pl-4">
+                                  +{template.exercises.length - 3} exercícios restantes
+                                </p>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -383,7 +416,7 @@ export default function TemplatesPage() {
                       <Link to={`/templates/editor/${template.id}`} className="block">
                         <Button
                           variant="default"
-                          className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                          className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 hover-scale"
                         >
                           <Pencil className="mr-2 h-4 w-4" />
                           Editar Template
@@ -391,7 +424,7 @@ export default function TemplatesPage() {
                       </Link>
                       <Button
                         variant="outline"
-                        className="w-full"
+                        className="w-full hover-scale"
                         onClick={() => startWorkoutFromTemplate(template.id)}
                       >
                         <Play className="mr-2 h-4 w-4" />
@@ -405,9 +438,9 @@ export default function TemplatesPage() {
           </motion.div>
         ) : (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.15, duration: 0.2 }}
             className="text-center"
           >
             <div className="relative mx-auto max-w-md">

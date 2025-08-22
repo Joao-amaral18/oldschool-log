@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import type { WorkoutTemplate } from '@/types'
@@ -22,6 +22,7 @@ export default function ImportWorkoutModal({ onClose, onImport }: ImportWorkoutM
     const [status, setStatus] = useState<ImportStatus>('idle')
     const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
     const [error, setError] = useState<string>('')
+    const [expandedTemplates, setExpandedTemplates] = useState<Set<number>>(new Set())
 
     const validateJSON = (json: any): ValidationResult => {
         const errors: string[] = []
@@ -121,6 +122,8 @@ export default function ImportWorkoutModal({ onClose, onImport }: ImportWorkoutM
                 exercises.push({
                     id: '', // Will be generated
                     exerciseId: '', // Will be generated
+                    exerciseName: exercise.exerciseName,
+                    muscleGroup: exercise.muscleGroup,
                     sets: exercise.sets,
                     reps: exercise.reps,
                     load: exercise.load,
@@ -200,6 +203,17 @@ export default function ImportWorkoutModal({ onClose, onImport }: ImportWorkoutM
         setValidationResult(null)
         setError('')
         setStatus('idle')
+        setExpandedTemplates(new Set())
+    }
+
+    const toggleTemplateExpanded = (templateIndex: number) => {
+        const newExpanded = new Set(expandedTemplates)
+        if (newExpanded.has(templateIndex)) {
+            newExpanded.delete(templateIndex)
+        } else {
+            newExpanded.add(templateIndex)
+        }
+        setExpandedTemplates(newExpanded)
     }
 
     return (
@@ -296,13 +310,58 @@ export default function ImportWorkoutModal({ onClose, onImport }: ImportWorkoutM
                                         <p className="text-sm text-muted-foreground">
                                             {validationResult.templates.length} template(s) válido(s) encontrado(s):
                                         </p>
-                                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                                        <div className="space-y-2 max-h-64 overflow-y-auto">
                                             {validationResult.templates.map((template, idx) => (
-                                                <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded">
-                                                    <span className="font-medium">{template.name}</span>
-                                                    <span className="text-sm text-muted-foreground">
-                                                        {template.exercises.length} exercícios
-                                                    </span>
+                                                <div key={idx} className="border border-border/50 rounded-lg p-3 bg-muted/30">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-medium">{template.name}</span>
+                                                            <span className="text-xs text-muted-foreground bg-primary/10 px-2 py-1 rounded">
+                                                                {template.exercises.length} exercícios
+                                                            </span>
+                                                        </div>
+                                                        {template.exercises.length > 0 && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-6 px-2 text-xs hover:bg-primary/10"
+                                                                onClick={() => toggleTemplateExpanded(idx)}
+                                                            >
+                                                                {expandedTemplates.has(idx) ? (
+                                                                    <>
+                                                                        <ChevronUp className="h-3 w-3 mr-1" />
+                                                                        Recolher
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <ChevronDown className="h-3 w-3 mr-1" />
+                                                                        Ver Exercícios
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+
+                                                    {expandedTemplates.has(idx) && (
+                                                        <div className="space-y-1 mt-2 pt-2 border-t border-border/30">
+                                                            <p className="text-xs font-medium text-muted-foreground mb-2">Exercícios:</p>
+                                                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                                {template.exercises.map((exercise, exerciseIdx) => (
+                                                                    <div key={exerciseIdx} className="flex items-center gap-2 text-xs text-muted-foreground bg-background/50 rounded px-2 py-1">
+                                                                        <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                                                                        <span className="flex-1 truncate">{(exercise as any).exerciseName || 'Exercício'}</span>
+                                                                        <div className="flex items-center gap-1 text-xs text-muted-foreground/60">
+                                                                            <span>{exercise.sets}×</span>
+                                                                            <span>{exercise.reps}</span>
+                                                                            {exercise.load && (
+                                                                                <span className="text-primary font-medium">{exercise.load}kg</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
