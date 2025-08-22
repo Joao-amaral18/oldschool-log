@@ -314,20 +314,18 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    notificationStatus === 'granted'
-                      ? 'bg-green-500/10'
-                      : notificationStatus === 'denied'
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${notificationStatus === 'granted'
+                    ? 'bg-green-500/10'
+                    : notificationStatus === 'denied'
                       ? 'bg-red-500/10'
                       : 'bg-muted/30'
-                  }`}>
-                    <Bell className={`h-5 w-5 ${
-                      notificationStatus === 'granted'
-                        ? 'text-green-600'
-                        : notificationStatus === 'denied'
+                    }`}>
+                    <Bell className={`h-5 w-5 ${notificationStatus === 'granted'
+                      ? 'text-green-600'
+                      : notificationStatus === 'denied'
                         ? 'text-red-600'
                         : 'text-muted-foreground'
-                    }`} />
+                      }`} />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Status das Notificações</p>
@@ -381,9 +379,8 @@ export default function SettingsPage() {
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  isOnline ? 'bg-green-500/10' : 'bg-red-500/10'
-                }`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOnline ? 'bg-green-500/10' : 'bg-red-500/10'
+                  }`}>
                   {isOnline ? (
                     <Wifi className="h-5 w-5 text-green-600" />
                   ) : (
@@ -442,7 +439,7 @@ export default function SettingsPage() {
               <Button
                 variant="outline"
                 onClick={dangerPurge}
-                className="gap-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300"
+                className="gap-2 text-red-700 hover:bg-red-700 hover:text-white hover:border-red-700 transition-colors duration-200"
               >
                 <Trash2 className="h-4 w-4" />
                 Apagar Tudo
@@ -452,13 +449,25 @@ export default function SettingsPage() {
         </Card>
       </section>
 
+      {/* Exercise Modal */}
       {modal && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
-          <Card className="w-full max-w-sm surface">
-            <CardContent className="pt-6">
-              <div className="mb-3 text-lg font-semibold">
-                {modal.mode === 'create' ? 'Adicionar Exercício' : 'Editar Exercício'}
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md border border-border/40 bg-card/95 backdrop-blur-xl">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center">
+                  <Dumbbell className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {modal.mode === 'create' ? 'Novo Exercício' : 'Editar Exercício'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {modal.mode === 'create' ? 'Adicione um exercício à sua biblioteca' : 'Atualize as informações do exercício'}
+                  </p>
+                </div>
               </div>
+
               <ExerciseForm
                 initial={{ name: modal.item?.name ?? '', muscleGroup: modal.item?.muscleGroup ?? 'other' }}
                 onCancel={() => setModal(null)}
@@ -483,9 +492,23 @@ function ExerciseForm({
 }) {
   const [name, setName] = useState(initial.name)
   const [group, setGroup] = useState<Exercise['muscleGroup']>(initial.muscleGroup)
+
+  const muscleGroups = [
+    { value: 'chest', label: 'Peito', icon: '💪' },
+    { value: 'back', label: 'Costas', icon: '🏋️' },
+    { value: 'legs', label: 'Pernas', icon: '🦵' },
+    { value: 'shoulders', label: 'Ombros', icon: '🤷' },
+    { value: 'biceps', label: 'Bíceps', icon: '💪' },
+    { value: 'triceps', label: 'Tríceps', icon: '💪' },
+    { value: 'glutes', label: 'Glúteos', icon: '🍑' },
+    { value: 'core', label: 'Core', icon: '🏃' },
+    { value: 'full-body', label: 'Corpo Inteiro', icon: '🌟' },
+    { value: 'other', label: 'Outro', icon: '🔧' },
+  ]
+
   return (
     <form
-      className="space-y-4"
+      className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault()
         if (!name.trim()) return
@@ -493,29 +516,58 @@ function ExerciseForm({
       }}
     >
       <div className="space-y-2">
-        <Label htmlFor="ex-name">Nome</Label>
-        <Input id="ex-name" value={name} onChange={(e) => setName(e.target.value)} />
+        <Label htmlFor="ex-name" className="text-sm font-medium text-foreground">
+          Nome do exercício
+        </Label>
+        <div className="relative">
+          <Dumbbell className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            id="ex-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex: Supino Reto, Agachamento..."
+            className="pl-10 h-11 border border-border/40 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+          />
+        </div>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="ex-group">Grupo muscular</Label>
-        <select
-          id="ex-group"
-          className="mt-1 w-full rounded-md border border-stone-700 px-3 py-2 text-sm"
-          value={group}
-          onChange={(e) => setGroup(e.target.value as Exercise['muscleGroup'])}
-        >
-          {['chest', 'back', 'legs', 'shoulders', 'biceps', 'triceps', 'glutes', 'core', 'full-body', 'other'].map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
+
+      <div className="space-y-3">
+        <Label className="text-sm font-medium text-foreground">Grupo muscular</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {muscleGroups.map((mg) => (
+            <button
+              key={mg.value}
+              type="button"
+              onClick={() => setGroup(mg.value as Exercise['muscleGroup'])}
+              className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-all duration-200 ${group === mg.value
+                ? 'border-blue-400 bg-blue-50 text-blue-900 shadow-sm'
+                : 'border-border/40 bg-card hover:border-border hover:shadow-sm text-foreground'
+                }`}
+            >
+              <span className="text-lg">{mg.icon}</span>
+              <span className="text-sm font-medium">{mg.label}</span>
+            </button>
           ))}
-        </select>
+        </div>
       </div>
-      <div className="flex items-center justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/40">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          className="px-4 py-2 text-muted-foreground hover:text-foreground"
+        >
           Cancelar
         </Button>
-        <Button type="submit">Salvar</Button>
+        <Button
+          type="submit"
+          disabled={!name.trim()}
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 gap-2"
+        >
+          <Settings2 className="h-4 w-4" />
+          Salvar Exercício
+        </Button>
       </div>
     </form>
   )
