@@ -13,7 +13,7 @@ import { formatSeconds, getRandomFromRange } from '@/lib/utils'
 import { toast } from 'sonner'
 import { X, Plus, Minus, ChevronDown, Timer, Circle, CheckCircle2 } from 'lucide-react'
 import { api } from '@/lib/api'
-import { notificationUtils, audioUtils } from '@/lib/notifications'
+import { audioUtils } from '@/lib/notifications'
 import { enqueueSet, registerSync } from '@/lib/offlineQueue'
 import { SessionSkeleton } from '@/components/skeletons'
 import { SwipeableSet } from '@/components/ui/swipeable-set'
@@ -33,13 +33,14 @@ export default function SessionPage() {
   const [expandedExerciseIndex, setExpandedExerciseIndex] = useState(0)
   const [completedExercises, setCompletedExercises] = useState<Set<number>>(new Set())
   const [exerciseStates, setExerciseStates] = useState<Record<string, ExerciseLocalState>>({})
-  const [activeRestTimers, setActiveRestTimers] = useState<Record<string, { remaining: number; total: number; intervalId?: number; notification?: Notification; wasInterrupted?: boolean }>>({})
+  const [activeRestTimers, setActiveRestTimers] = useState<Record<string, { remaining: number; total: number; intervalId?: number; wasInterrupted?: boolean }>>({})
   const exerciseRefs = useRef<Array<HTMLDivElement | null>>([])
   const timerRef = useRef<number | null>(null)
   const startedAtRef = useRef<number>(Date.now())
   const workoutIdRef = useRef<string>('')
+  const [workoutId, setWorkoutId] = useState<string>('')
   const performedExerciseIdsRef = useRef<string[]>([])
-  const restTimersRef = useRef<Record<string, { remaining: number; total: number; intervalId?: number; notification?: Notification; wasInterrupted?: boolean }>>({})
+  const restTimersRef = useRef<Record<string, { remaining: number; total: number; intervalId?: number; wasInterrupted?: boolean }>>({})
 
   // Initialize session
   useEffect(() => {
@@ -83,7 +84,12 @@ export default function SessionPage() {
 
         // Start workout in backend
         const started = await api.startWorkout(tpl)
-        workoutIdRef.current = started.workoutId
+        if (!started.workoutId) {
+          throw new Error('Failed to get workout ID from server')
+        }
+        const newWorkoutId = started.workoutId
+        workoutIdRef.current = newWorkoutId
+        setWorkoutId(newWorkoutId)
         startedAtRef.current = Date.parse(started.startedAt as unknown as string) || Date.now()
         // Map performed exercise ids aligned by index
         performedExerciseIdsRef.current = tpl.exercises.map((te) => started.performedMapByTemplateExerciseId[te.id])
@@ -104,28 +110,49 @@ export default function SessionPage() {
           }
         }
         // Restore draft if present
-        try {
+        if (workoutIdRef.current) {
           const key = `session-draft:${workoutIdRef.current}`
-          const raw = localStorage.getItem(key)
-          if (raw) {
-            const saved = JSON.parse(raw) as Record<string, ExerciseLocalState>
-            setExerciseStates(saved)
-          } else {
+          try {
+            const raw = localStorage.getItem(key)
+            if (raw) {
+              const saved = JSON.parse(raw) as Record<string, ExerciseLocalState>
+              // Validate that the saved data has the expected structure
+              const isValid = Object.keys(saved).length > 0 &&
+                Object.values(saved).every(exerciseState =>
+                  exerciseState &&
+                  typeof exerciseState === 'object' &&
+                  typeof exerciseState.isCompleted === 'boolean' &&
+                  Array.isArray(exerciseState.sets) &&
+                  exerciseState.sets.every((set: any) =>
+                    set &&
+                    typeof set === 'object' &&
+                    typeof set.id === 'number' &&
+                    typeof set.reps === 'string' &&
+                    typeof set.load === 'string' &&
+                    typeof set.isCompleted === 'boolean'
+                  )
+                )
+
+              if (isValid) {
+                setExerciseStates(saved)
+              } else {
+                console.warn('Invalid draft data structure, clearing and using initial state')
+                localStorage.removeItem(key)
+                setExerciseStates(init)
+              }
+            } else {
+              setExerciseStates(init)
+            }
+          } catch (error) {
+            console.error('Failed to restore session draft:', error)
+            localStorage.removeItem(key)
             setExerciseStates(init)
           }
-        } catch {
+        } else {
+          // No workout ID yet, use initial state
           setExerciseStates(init)
         }
         exerciseRefs.current = Array.from({ length: tpl.exercises.length }, () => null)
-
-        // Request notification permission for rest timer notifications
-        if (notificationUtils.isSupported() && notificationUtils.getPermission() === 'default') {
-          notificationUtils.requestPermission().then(permission => {
-            if (permission === 'granted') {
-              console.log('Notification permission granted for rest timer')
-            }
-          })
-        }
 
         // Timer will be started in a separate effect once template is ready
       } catch (e: any) {
@@ -137,21 +164,19 @@ export default function SessionPage() {
     // Ensure background sync is registered when session page is active
     registerSync()
     return () => {
-      if (timerRef.current) window.clearInterval(timerRef.current)
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current)
+        timerRef.current = null
+      }
       navigator.serviceWorker?.removeEventListener?.('message', onSwMessage as any)
 
-      // Clean up all active rest timers and notifications
+      // Clean up all active rest timers
       Object.values(restTimersRef.current).forEach(timer => {
         if (timer.intervalId) {
           window.clearInterval(timer.intervalId)
         }
-        if (timer.notification) {
-          timer.notification.close()
-        }
       })
-
-      // Close any remaining rest timer notifications
-      notificationUtils.closeRestTimerNotifications()
+      restTimersRef.current = {}
     }
   }, [session, templateId])
 
@@ -170,22 +195,24 @@ export default function SessionPage() {
     }, 1000)
     timerRef.current = id as unknown as number
     return () => {
-      if (timerRef.current) {
-        window.clearInterval(timerRef.current)
+      window.clearInterval(id)
+      if (timerRef.current === id) {
         timerRef.current = null
-      } else {
-        window.clearInterval(id)
       }
     }
   }, [template?.id])
 
   // Persist drafts per workout (must come before any conditional return)
   useEffect(() => {
-    const key = `session-draft:${workoutIdRef.current}`
-    try {
-      if (workoutIdRef.current) localStorage.setItem(key, JSON.stringify(exerciseStates))
-    } catch { }
-  }, [exerciseStates])
+    if (workoutId && Object.keys(exerciseStates).length > 0) {
+      const key = `session-draft:${workoutId}`
+      try {
+        localStorage.setItem(key, JSON.stringify(exerciseStates))
+      } catch (error) {
+        console.warn('Failed to save session draft:', error)
+      }
+    }
+  }, [exerciseStates, workoutId])
 
   if (!template) {
     return <SessionSkeleton />
@@ -256,7 +283,6 @@ export default function SessionPage() {
 
   const startRestTimer = async (exerciseId: string, setId: number) => {
     const exercise = template.exercises.find((te) => te.id === exerciseId)
-    const exerciseName = exercises.find((e) => e.id === exercise?.exerciseId)?.name || 'Exercício'
     const restSec = typeof exercise?.restSec === 'number' ? exercise.restSec : parseInt(String(exercise?.restSec)) || 0
     if (!restSec || restSec <= 0) return
 
@@ -267,14 +293,6 @@ export default function SessionPage() {
     if (activeRestTimers[timerKey]?.intervalId) {
       window.clearInterval(activeRestTimers[timerKey].intervalId)
     }
-
-    // Create notification for rest timer
-    const notification = await notificationUtils.sendRestTimerNotification(
-      exerciseName,
-      setId,
-      totalSeconds,
-      totalSeconds
-    )
 
     const intervalId = window.setInterval(() => {
       setActiveRestTimers((prev) => {
@@ -287,7 +305,7 @@ export default function SessionPage() {
           // Timer completed naturally (not interrupted)
           window.clearInterval(intervalId)
 
-          // Only play alarm and show completion notification if timer wasn't interrupted
+          // Only play alarm if timer wasn't interrupted
           if (!timer.wasInterrupted) {
             // Play alarm sound
             audioUtils.playRestAlarm().catch(error => {
@@ -299,14 +317,6 @@ export default function SessionPage() {
             if (vibrationSuccess) {
               console.log('Rest timer vibration triggered')
             }
-
-            // Send completion notification
-            notificationUtils.sendRestTimerCompleteNotification(exerciseName, setId)
-          }
-
-          // Close the ongoing notification
-          if (timer.notification) {
-            timer.notification.close()
           }
 
           const next = { ...prev }
@@ -315,37 +325,7 @@ export default function SessionPage() {
           return next
         }
 
-        // Update notification with new time (only if supported)
-        if (timer.notification && notificationUtils.isSupported() && notificationUtils.getPermission() === 'granted') {
-          // Create a new notification with updated content
-          const progress = Math.round(((totalSeconds - newRemaining) / totalSeconds) * 100)
-          const formatTime = (seconds: number): string => {
-            const mins = Math.floor(seconds / 60)
-            const secs = seconds % 60
-            return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`
-          }
 
-          // Close old notification
-          timer.notification.close()
-
-          // Create new notification with updated content
-          const updatedNotification = new Notification('⏱️ Descanso em Andamento', {
-            body: `${exerciseName} - Série ${setId}\n${formatTime(newRemaining)} restantes (${progress}%)`,
-            icon: '/icons/icon-192.png',
-            badge: '/icons/icon-192.png',
-            tag: 'rest-timer-notification',
-            requireInteraction: true,
-            silent: false
-          })
-
-          updatedNotification.onclick = () => {
-            window.focus()
-            updatedNotification.close()
-          }
-
-          // Update timer with new notification
-          timer.notification = updatedNotification
-        }
 
         // Add warning vibration when timer reaches warning threshold (10 seconds or less)
         if (newRemaining <= 10 && newRemaining > 0 && !timer.wasInterrupted) {
@@ -367,7 +347,6 @@ export default function SessionPage() {
       remaining: totalSeconds,
       total: totalSeconds,
       intervalId,
-      notification: notification || undefined,
       wasInterrupted: false
     }
 
@@ -385,11 +364,6 @@ export default function SessionPage() {
 
     if (timer?.intervalId) {
       window.clearInterval(timer.intervalId)
-    }
-
-    // Close the notification
-    if (timer?.notification) {
-      timer.notification.close()
     }
 
     setActiveRestTimers((prev) => {
@@ -416,38 +390,7 @@ export default function SessionPage() {
       const newRemaining = Math.max(0, timer.remaining + adjustment)
       const newTotal = Math.max(0, timer.total + adjustment)
 
-      // Update notification if it exists
-      if (timer.notification && notificationUtils.isSupported() && notificationUtils.getPermission() === 'granted') {
-        const exercise = template.exercises.find((te) => te.id === exerciseId)
-        const exerciseName = exercises.find((e) => e.id === exercise?.exerciseId)?.name || 'Exercício'
 
-        const progress = Math.round(((newTotal - newRemaining) / newTotal) * 100)
-        const formatTime = (seconds: number): string => {
-          const mins = Math.floor(seconds / 60)
-          const secs = seconds % 60
-          return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`
-        }
-
-        // Close old notification
-        timer.notification.close()
-
-        // Create new notification with updated content
-        const updatedNotification = new Notification('⏱️ Descanso em Andamento', {
-          body: `${exerciseName} - Série ${setId}\n${formatTime(newRemaining)} restantes (${progress}%)`,
-          icon: '/icons/icon-192.png',
-          badge: '/icons/icon-192.png',
-          tag: 'rest-timer-notification',
-          requireInteraction: true,
-          silent: false
-        })
-
-        updatedNotification.onclick = () => {
-          window.focus()
-          updatedNotification.close()
-        }
-
-        timer.notification = updatedNotification
-      }
 
       next[timerKey] = {
         ...timer,

@@ -23,8 +23,8 @@ export type Tables = {
         Update: Partial<Tables['templates']['Insert']>
     }
     template_exercises: {
-        Row: { id: string; user_id: string; template_id: string; exercise_id: string; position: number; sets: number; reps: number; load: number; rest_sec: number; created_at: string; updated_at: string }
-        Insert: { id?: string; user_id?: string; template_id: string; exercise_id: string; position?: number; sets: number; reps: number; load: number; rest_sec: number }
+        Row: { id: string; user_id: string; template_id: string; exercise_id: string; position: number; sets: string; reps: string; load: number | null; rest_sec: string; created_at: string; updated_at: string }
+        Insert: { id?: string; user_id?: string; template_id: string; exercise_id: string; position?: number; sets: string; reps: string; load: number | null; rest_sec: string }
         Update: Partial<Tables['template_exercises']['Insert']>
     }
     workout_histories: {
@@ -38,8 +38,8 @@ export type Tables = {
         Update: Partial<Tables['performed_exercises']['Insert']>
     }
     performed_sets: {
-        Row: { id: string; user_id: string; performed_exercise_id: string; planned_reps: number | null; planned_load: number | null; reps: number; load: number; kind: 'warmup' | 'recognition' | 'working'; done_at: string; created_at: string; updated_at: string }
-        Insert: { id?: string; user_id?: string; performed_exercise_id: string; planned_reps?: number | null; planned_load?: number | null; reps: number; load: number; kind?: 'warmup' | 'recognition' | 'working'; done_at?: string }
+        Row: { id: string; user_id: string; performed_exercise_id: string; planned_reps: string | null; planned_load: number | null; reps: string; load: number | null; kind: 'warmup' | 'recognition' | 'working'; done_at: string; created_at: string; updated_at: string }
+        Insert: { id?: string; user_id?: string; performed_exercise_id: string; planned_reps?: string | null; planned_load?: number | null; reps: string; load: number | null; kind?: 'warmup' | 'recognition' | 'working'; done_at?: string }
         Update: Partial<Tables['performed_sets']['Insert']>
     }
 }

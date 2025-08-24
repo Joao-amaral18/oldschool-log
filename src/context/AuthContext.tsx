@@ -16,8 +16,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<UserSession | null>(() => {
     try {
       const raw = localStorage.getItem('auth:session')
-      return raw ? (JSON.parse(raw) as UserSession) : null
-    } catch {
+      if (!raw) return null
+
+      const parsed = JSON.parse(raw) as UserSession
+      // Basic validation of session structure
+      if (!parsed.userId || !parsed.username || typeof parsed.userId !== 'string' || typeof parsed.username !== 'string') {
+        localStorage.removeItem('auth:session')
+        return null
+      }
+      return parsed
+    } catch (error) {
+      console.warn('Invalid session data in localStorage:', error)
+      localStorage.removeItem('auth:session')
       return null
     }
   });

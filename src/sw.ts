@@ -153,8 +153,12 @@ self.addEventListener('fetch', (event: FetchEvent) => {
             try {
                 // Network-first for API calls
                 const response = await fetch(request)
-                const cache = await caches.open('api-cache-v1')
-                cache.put(request, response.clone())
+                try {
+                    const cache = await caches.open('api-cache-v1')
+                    cache.put(request, response.clone())
+                } catch (cacheError) {
+                    console.warn('Failed to cache API response:', cacheError)
+                }
                 return response
             } catch (error) {
                 // Try cache if network fails
@@ -172,6 +176,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
                     })
                 }
 
+                console.error('Service worker fetch error:', error)
                 throw error
             }
         })())
@@ -186,11 +191,16 @@ self.addEventListener('fetch', (event: FetchEvent) => {
         try {
             const response = await fetch(request)
             if (response.ok) {
-                const cache = await caches.open(APP_SHELL_CACHE)
-                cache.put(request, response.clone())
+                try {
+                    const cache = await caches.open(APP_SHELL_CACHE)
+                    cache.put(request, response.clone())
+                } catch (cacheError) {
+                    console.warn('Failed to cache static asset:', cacheError)
+                }
             }
             return response
         } catch (error) {
+            console.error('Failed to fetch static asset:', error)
             // For static assets, return a meaningful offline response
             if (request.destination === 'image') {
                 return new Response('Image not available offline', {

@@ -47,37 +47,51 @@ export async function registerSync() {
 }
 
 export async function listQueuedPerformedSets(): Promise<Array<{ id: number; performedExerciseId: string; set: PerformedSet }>> {
-    const db = await openDb()
-    return await new Promise((resolve, reject) => {
-        const tx = db.transaction('sets', 'readonly')
-        const store = tx.objectStore('sets')
-        const req = store.getAll()
-        req.onsuccess = () => {
-            const list = (req.result as Array<any>).map((raw: any, idx: number) => {
-                const id = raw.id ?? idx
-                if (raw?.type === 'performed-set' && raw.performedExerciseId && raw.set) {
-                    return { id, performedExerciseId: raw.performedExerciseId as string, set: raw.set as PerformedSet }
+    try {
+        const db = await openDb()
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction('sets', 'readonly')
+            const store = tx.objectStore('sets')
+            const req = store.getAll()
+            req.onsuccess = () => {
+                try {
+                    const list = (req.result as Array<any>).map((raw: any, idx: number) => {
+                        const id = raw.id ?? idx
+                        if (raw?.type === 'performed-set' && raw.performedExerciseId && raw.set) {
+                            return { id, performedExerciseId: raw.performedExerciseId as string, set: raw.set as PerformedSet }
+                        }
+                        if (raw?.payload?.performedExerciseId && raw?.payload?.set) {
+                            return { id, performedExerciseId: raw.payload.performedExerciseId as string, set: raw.payload.set as PerformedSet }
+                        }
+                        return null
+                    }).filter(Boolean)
+                    resolve(list as Array<{ id: number; performedExerciseId: string; set: PerformedSet }>)
+                } catch (error) {
+                    reject(error)
                 }
-                if (raw?.payload?.performedExerciseId && raw?.payload?.set) {
-                    return { id, performedExerciseId: raw.payload.performedExerciseId as string, set: raw.payload.set as PerformedSet }
-                }
-                return null
-            }).filter(Boolean)
-            resolve(list as Array<{ id: number; performedExerciseId: string; set: PerformedSet }>)
-        }
-        req.onerror = () => reject(req.error)
-    })
+            }
+            req.onerror = () => reject(req.error)
+        })
+    } catch (error) {
+        console.error('Failed to open offline queue database:', error)
+        return []
+    }
 }
 
 export async function removeQueuedItem(id: number): Promise<void> {
-    const db = await openDb()
-    await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction('sets', 'readwrite')
-        const store = tx.objectStore('sets')
-        const del = store.delete(id)
-        del.onsuccess = () => resolve()
-        del.onerror = () => reject(del.error)
-    })
+    try {
+        const db = await openDb()
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('sets', 'readwrite')
+            const store = tx.objectStore('sets')
+            const del = store.delete(id)
+            del.onsuccess = () => resolve()
+            del.onerror = () => reject(del.error)
+        })
+    } catch (error) {
+        console.error('Failed to remove queued item:', error)
+        throw error
+    }
 }
 
 
