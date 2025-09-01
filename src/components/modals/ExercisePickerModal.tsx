@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Check } from 'lucide-react'
+import { Search, Check, Clock, Star } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,16 +38,57 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
     const [group, setGroup] = useState<MuscleGroup | 'all'>('all')
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [highlightIndex, setHighlightIndex] = useState<number>(-1)
+    const [recentExercises, setRecentExercises] = useState<string[]>([])
+    const [favoriteExercises, setFavoriteExercises] = useState<Set<string>>(new Set())
     const inputRef = useRef<HTMLInputElement>(null)
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase()
-        return exercises.filter((ex) => {
+        let results = exercises.filter((ex) => {
             const byGroup = group === 'all' || ex.muscleGroup === group
             const byText = q.length === 0 || ex.name.toLowerCase().includes(q)
             return byGroup && byText
         })
-    }, [exercises, query, group])
+
+        // Sort by priority: favorites first, then recent, then alphabetical
+        results.sort((a, b) => {
+            const aIsFavorite = favoriteExercises.has(a.id)
+            const bIsFavorite = favoriteExercises.has(b.id)
+            if (aIsFavorite && !bIsFavorite) return -1
+            if (!aIsFavorite && bIsFavorite) return 1
+
+            const aRecentIndex = recentExercises.indexOf(a.id)
+            const bRecentIndex = recentExercises.indexOf(b.id)
+            if (aRecentIndex !== -1 && bRecentIndex === -1) return -1
+            if (aRecentIndex === -1 && bRecentIndex !== -1) return 1
+            if (aRecentIndex !== -1 && bRecentIndex !== -1) {
+                return aRecentIndex - bRecentIndex
+            }
+
+            return a.name.localeCompare(b.name)
+        })
+
+        return results
+    }, [exercises, query, group, recentExercises, favoriteExercises])
+
+    // Load recent and favorite exercises from localStorage
+    useEffect(() => {
+        if (open) {
+            try {
+                const savedRecents = localStorage.getItem('exercise-picker-recent')
+                if (savedRecents) {
+                    setRecentExercises(JSON.parse(savedRecents))
+                }
+
+                const savedFavorites = localStorage.getItem('exercise-picker-favorites')
+                if (savedFavorites) {
+                    setFavoriteExercises(new Set(JSON.parse(savedFavorites)))
+                }
+            } catch (error) {
+                console.warn('Failed to load exercise preferences:', error)
+            }
+        }
+    }, [open])
 
     // Focus search when modal opens
     useEffect(() => {
@@ -65,6 +106,34 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
         }
     }, [open, filtered, selectedId])
 
+    // Track exercise usage for recent list
+    const trackExerciseUsage = (exerciseId: string) => {
+        const updated = [exerciseId, ...recentExercises.filter(id => id !== exerciseId)].slice(0, 10)
+        setRecentExercises(updated)
+        try {
+            localStorage.setItem('exercise-picker-recent', JSON.stringify(updated))
+        } catch (error) {
+            console.warn('Failed to save recent exercises:', error)
+        }
+    }
+
+    // Toggle favorite status
+    const toggleFavorite = (exerciseId: string, event: React.MouseEvent) => {
+        event.stopPropagation()
+        const newFavorites = new Set(favoriteExercises)
+        if (newFavorites.has(exerciseId)) {
+            newFavorites.delete(exerciseId)
+        } else {
+            newFavorites.add(exerciseId)
+        }
+        setFavoriteExercises(newFavorites)
+        try {
+            localStorage.setItem('exercise-picker-favorites', JSON.stringify([...newFavorites]))
+        } catch (error) {
+            console.warn('Failed to save favorite exercises:', error)
+        }
+    }
+
     const handleKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
         if (filtered.length === 0) return
         if (e.key === 'ArrowDown') {
@@ -78,6 +147,7 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
             const id = filtered[highlightIndex]?.id
             if (id) {
                 setSelectedId(id)
+                trackExerciseUsage(id)
                 onSelect(id)
                 onClose()
             }
@@ -117,6 +187,8 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
                     {filtered.map((ex) => {
                         const isSelected = selectedId === ex.id
                         const isActive = filtered[highlightIndex]?.id === ex.id
+                        const isFavorite = favoriteExercises.has(ex.id)
+                        const isRecent = recentExercises.includes(ex.id)
                         return (
                             <button
                                 key={ex.id}
@@ -130,14 +202,29 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
                                         : 'hover:border-zinc-500 hover:bg-accent/60'
                                     }`}
                                 onClick={() => setSelectedId(ex.id)}
-                                onDoubleClick={() => { setSelectedId(ex.id); onSelect(ex.id); onClose() }}
+                                onDoubleClick={() => {
+                                    setSelectedId(ex.id)
+                                    trackExerciseUsage(ex.id)
+                                    onSelect(ex.id)
+                                    onClose()
+                                }}
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         {isSelected && <Check className="h-4 w-4 text-primary" />}
                                         <div className="font-medium text-sm tracking-tight">{ex.name}</div>
+                                        {isFavorite && <Star className="h-3.5 w-3.5 text-yellow-500 fill-current" />}
+                                        {isRecent && !isFavorite && <Clock className="h-3.5 w-3.5 text-blue-400" />}
                                     </div>
-                                    <div className="text-xs text-muted-foreground px-2 py-0.5 rounded-md border border-stone-700 bg-muted/30">{muscleGroupLabels[ex.muscleGroup]}</div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={(e) => toggleFavorite(ex.id, e)}
+                                            className={`p-1 rounded hover:bg-accent/80 ${isFavorite ? 'text-yellow-500' : 'text-muted-foreground'}`}
+                                        >
+                                            <Star className="h-3 w-3" />
+                                        </button>
+                                        <div className="text-xs text-muted-foreground px-2 py-0.5 rounded-md border border-stone-700 bg-muted/30">{muscleGroupLabels[ex.muscleGroup]}</div>
+                                    </div>
                                 </div>
                             </button>
                         )
@@ -152,7 +239,13 @@ export function ExercisePickerModal({ open, onClose, title, description, exercis
                         {onCreateNew && (
                             <Button type="button" variant="outline" onClick={async () => { await onCreateNew(); onClose() }}>+ Criar novo exercício</Button>
                         )}
-                        <Button type="button" onClick={() => { if (selectedId) { onSelect(selectedId); onClose() } }} disabled={!selectedId}>Selecionar</Button>
+                        <Button type="button" onClick={() => {
+                            if (selectedId) {
+                                trackExerciseUsage(selectedId)
+                                onSelect(selectedId)
+                                onClose()
+                            }
+                        }} disabled={!selectedId}>Selecionar</Button>
                     </div>
                 </DialogFooter>
             </DialogContent>

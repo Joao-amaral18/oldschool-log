@@ -371,14 +371,44 @@ export const api = {
         }))
     },
     // History
-    async listHistories(): Promise<Array<{ id: string; templateName: string | null; startedAt: string; finishedAt: string | null; durationSec: number | null; totalSets: number }>> {
+    async updateWorkoutNotes(workoutId: string, notes: string): Promise<void> {
+        const { error } = await supabase
+            .from('workout_histories')
+            .update({ notes })
+            .eq('id', workoutId)
+
+        if (error) throw error
+    },
+
+    async listHistories(): Promise<Array<{
+        id: string;
+        templateName: string | null;
+        startedAt: string;
+        finishedAt: string | null;
+        durationSec: number | null;
+        totalSets: number;
+        totalVolume: number;
+        exercises: Array<{
+            id: string;
+            name: string;
+            muscleGroup: string;
+            sets: Array<{
+                reps: string;
+                load: number | null;
+                kind: 'warmup' | 'recognition' | 'working';
+                doneAt: string;
+            }>;
+        }>;
+        notes?: string;
+    }>> {
         // Only consider workouts that were finalized (finished_at not null)
         const { data: histories, error } = await supabase
             .from('workout_histories')
-            .select('id, template_id, started_at, finished_at, duration_sec')
+            .select('id, template_id, started_at, finished_at, duration_sec, notes')
             .not('finished_at', 'is', null)
             .order('started_at', { ascending: false })
         if (error) throw error
+
         const ids = (histories || []).map((h) => h.id)
         const templateIds = (histories || []).map((h) => h.template_id).filter(Boolean) as string[]
 
@@ -389,26 +419,66 @@ export const api = {
             for (const t of trows || []) templateNames[t.id] = t.name
         }
 
-        // Count sets per workout
-        let counts: Record<string, number> = {}
+        // Fetch detailed workout data
+        const workoutDetails: Record<string, any> = {}
         if (ids.length > 0) {
-            const { data: pes } = await supabase
+            // Get performed exercises with exercise details
+            const { data: performedExercises } = await supabase
                 .from('performed_exercises')
-                .select('id, workout_id')
+                .select(`
+                    id,
+                    workout_id,
+                    exercise_id,
+                    exercises!inner(id, name, muscle_group)
+                `)
                 .in('workout_id', ids)
-            const peIds = (pes || []).map((r) => r.id)
-            const peByWorkout: Record<string, string[]> = {}
-            for (const r of pes || []) (peByWorkout[r.workout_id] ||= []).push(r.id)
-            if (peIds.length > 0) {
-                const { data: psets } = await supabase
-                    .from('performed_sets')
-                    .select('performed_exercise_id')
-                    .in('performed_exercise_id', peIds)
-                const counter: Record<string, number> = {}
-                for (const s of psets || []) counter[s.performed_exercise_id] = (counter[s.performed_exercise_id] || 0) + 1
-                counts = Object.fromEntries(
-                    Object.entries(peByWorkout).map(([workoutId, list]) => [workoutId, list.reduce((acc, id) => acc + (counter[id] || 0), 0)])
-                )
+
+            // Get all sets for these exercises
+            const peIds = (performedExercises || []).map(pe => pe.id)
+            const { data: performedSets } = await supabase
+                .from('performed_sets')
+                .select('performed_exercise_id, reps, load, kind, done_at')
+                .in('performed_exercise_id', peIds)
+                .order('done_at', { ascending: true })
+
+            // Organize data by workout
+            for (const workoutId of ids) {
+                const workoutPEs = (performedExercises || []).filter(pe => pe.workout_id === workoutId)
+                const exercises: any[] = []
+
+                let totalSets = 0
+                let totalVolume = 0
+
+                for (const pe of workoutPEs) {
+                    const sets = (performedSets || [])
+                        .filter(ps => ps.performed_exercise_id === pe.id)
+                        .map(ps => ({
+                            reps: ps.reps,
+                            load: ps.load ? Number(ps.load) : null,
+                            kind: ps.kind,
+                            doneAt: ps.done_at
+                        }))
+
+                    exercises.push({
+                        id: pe.id,
+                        name: pe.exercises?.[0]?.name || 'Exercício',
+                        muscleGroup: pe.exercises?.[0]?.muscle_group || 'other',
+                        sets
+                    })
+
+                    totalSets += sets.length
+                    totalVolume += sets.reduce((sum, set) => {
+                        const reps = parseFloat(set.reps) || 0
+                        const load = set.load || 0
+                        return sum + (reps * load)
+                    }, 0)
+                }
+
+                workoutDetails[workoutId] = {
+                    exercises,
+                    totalSets,
+                    totalVolume
+                }
             }
         }
 
@@ -418,7 +488,8 @@ export const api = {
             startedAt: h.started_at,
             finishedAt: h.finished_at,
             durationSec: h.duration_sec,
-            totalSets: counts[h.id] || 0,
+            notes: h.notes,
+            ...workoutDetails[h.id] || { exercises: [], totalSets: 0, totalVolume: 0 }
         }))
     },
 

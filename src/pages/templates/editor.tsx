@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { formatRangeDisplay } from '@/lib/utils'
-import { ChevronDown, ChevronUp, Plus, Trash2, Dumbbell, MoreVertical } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Dumbbell, MoreVertical, Copy, Settings, Zap } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { motion } from 'framer-motion'
 import { api } from '@/lib/api'
@@ -286,6 +286,42 @@ export default function TemplateEditorPage() {
     })
   }
 
+  const duplicateSetRow = (exerciseId: string, rowIndex: number) => {
+    setSetRowsByExercise((prev) => {
+      const rows = (prev[exerciseId] ?? []).slice()
+      const rowToDuplicate = rows[rowIndex]
+      if (rowToDuplicate) {
+        rows.splice(rowIndex + 1, 0, { ...rowToDuplicate })
+        return { ...prev, [exerciseId]: rows }
+      }
+      return prev
+    })
+  }
+
+  const applyQuickSet = (exerciseId: string, setType: 'strength' | 'hypertrophy' | 'endurance') => {
+    const quickSets = {
+      strength: { reps: '3-5', load: 0, restSec: '180-240' },
+      hypertrophy: { reps: '8-12', load: 0, restSec: '90-120' },
+      endurance: { reps: '15-20', load: 0, restSec: '45-60' }
+    }
+
+    setSetRowsByExercise((prev) => {
+      const rows = (prev[exerciseId] ?? []).slice()
+      const newRows = rows.length > 0
+        ? rows.map(row => ({ ...row, ...quickSets[setType] }))
+        : [quickSets[setType]]
+
+      return { ...prev, [exerciseId]: newRows }
+    })
+
+    const typeLabels = {
+      strength: 'Força',
+      hypertrophy: 'Hipertrofia',
+      endurance: 'Resistência'
+    }
+    toast.success(`Aplicado template de ${typeLabels[setType]} ao exercício`)
+  }
+
   // row actions simplified: reorder removed for per-row; duplication available in card menu
 
 
@@ -391,7 +427,38 @@ export default function TemplateEditorPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1 rounded-md border border-stone-700 px-2 py-0.5"><Dumbbell className="h-3.5 w-3.5" /> Exercício</span>
+                    <span className="inline-flex items-center gap-1 rounded-md border border-stone-700 px-2 py-0.5">
+                      <Dumbbell className="h-3.5 w-3.5" /> Exercício
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => applyQuickSet(te.id, 'strength')}
+                      className="h-6 px-2 text-xs hover:bg-red-500/10 hover:text-red-400"
+                    >
+                      <Zap className="h-3 w-3 mr-1" />
+                      Força
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => applyQuickSet(te.id, 'hypertrophy')}
+                      className="h-6 px-2 text-xs hover:bg-blue-500/10 hover:text-blue-400"
+                    >
+                      <Settings className="h-3 w-3 mr-1" />
+                      Volume
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => applyQuickSet(te.id, 'endurance')}
+                      className="h-6 px-2 text-xs hover:bg-green-500/10 hover:text-green-400"
+                    >
+                      <ChevronUp className="h-3 w-3 mr-1" />
+                      Resist.
+                    </Button>
                   </div>
                 </div>
 
@@ -431,8 +498,18 @@ export default function TemplateEditorPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => duplicateSetRow(te.id, rowIdx)}
+                            className="hover:bg-green-500/10 hover:text-green-400"
+                            title="Duplicar série"
+                          >
+                            <Copy size={14} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => removeSetRow(te.id, rowIdx)}
                             disabled={(setRowsByExercise[te.id]?.length ?? 1) <= 1}
+                            className="hover:bg-red-500/10 hover:text-red-400"
                           >
                             <Trash2 size={16} />
                           </Button>

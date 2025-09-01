@@ -21,6 +21,42 @@ import { SwipeableSet } from '@/components/ui/swipeable-set'
 type LocalSet = { id: number; reps: string; load: string; isCompleted: boolean }
 type ExerciseLocalState = { sets: LocalSet[]; isCompleted: boolean }
 
+// Enhanced validation function for exercise states
+const validateExerciseStates = (states: Record<string, ExerciseLocalState>, templateExercises: any[]): boolean => {
+  if (!states || typeof states !== 'object') return false
+
+  const stateKeys = Object.keys(states)
+  const templateIds = templateExercises.map(te => te.id)
+
+  // Check if we have states for all template exercises
+  if (stateKeys.length === 0 || !templateIds.every(id => stateKeys.includes(id))) {
+    return false
+  }
+
+  // Validate each exercise state
+  return Object.entries(states).every(([exerciseId, exerciseState]) => {
+    // Check exercise state structure
+    if (!exerciseState || typeof exerciseState !== 'object') return false
+    if (typeof exerciseState.isCompleted !== 'boolean') return false
+    if (!Array.isArray(exerciseState.sets)) return false
+
+    // Validate each set
+    return exerciseState.sets.every(set => {
+      if (!set || typeof set !== 'object') return false
+      if (typeof set.id !== 'number') return false
+      if (typeof set.reps !== 'string') return false
+      if (typeof set.load !== 'string') return false
+      if (typeof set.isCompleted !== 'boolean') return false
+
+      // Additional validation for set values
+      if (set.reps.trim() === '') return false
+      if (isNaN(parseFloat(set.load))) return false
+
+      return true
+    })
+  })
+}
+
 export default function SessionPage() {
   const { templateId } = useParams<{ templateId: string }>()
   const { session } = useAuth()
@@ -65,6 +101,7 @@ export default function SessionPage() {
       }
     }
     navigator.serviceWorker?.addEventListener?.('message', onSwMessage as any)
+
     const boot = async () => {
       if (!session) {
         navigate('/login')
@@ -91,6 +128,7 @@ export default function SessionPage() {
         workoutIdRef.current = newWorkoutId
         setWorkoutId(newWorkoutId)
         startedAtRef.current = Date.parse(started.startedAt as unknown as string) || Date.now()
+
         // Map performed exercise ids aligned by index
         performedExerciseIdsRef.current = tpl.exercises.map((te) => started.performedMapByTemplateExerciseId[te.id])
         setPerformedSetsState(tpl.exercises.map(() => []))
@@ -109,49 +147,53 @@ export default function SessionPage() {
             })),
           }
         }
-        // Restore draft if present
-        if (workoutIdRef.current) {
-          const key = `session-draft:${workoutIdRef.current}`
-          try {
-            const raw = localStorage.getItem(key)
-            if (raw) {
-              const saved = JSON.parse(raw) as Record<string, ExerciseLocalState>
-              // Validate that the saved data has the expected structure
-              const isValid = Object.keys(saved).length > 0 &&
-                Object.values(saved).every(exerciseState =>
-                  exerciseState &&
-                  typeof exerciseState === 'object' &&
-                  typeof exerciseState.isCompleted === 'boolean' &&
-                  Array.isArray(exerciseState.sets) &&
-                  exerciseState.sets.every((set: any) =>
-                    set &&
-                    typeof set === 'object' &&
-                    typeof set.id === 'number' &&
-                    typeof set.reps === 'string' &&
-                    typeof set.load === 'string' &&
-                    typeof set.isCompleted === 'boolean'
-                  )
-                )
 
-              if (isValid) {
-                setExerciseStates(saved)
-              } else {
-                console.warn('Invalid draft data structure, clearing and using initial state')
-                localStorage.removeItem(key)
+        // Try to restore draft if present (AFTER workoutId is set)
+        const key = `session-draft:${newWorkoutId}`
+        try {
+          const raw = localStorage.getItem(key)
+          if (raw) {
+            const saved = JSON.parse(raw) as Record<string, ExerciseLocalState>
+            // Enhanced validation for draft data
+            const isValid = validateExerciseStates(saved, tpl.exercises)
+
+            if (isValid) {
+              console.log('Restoring session draft:', Object.keys(saved).length, 'exercises')
+              setExerciseStates(saved)
+            } else {
+              console.warn('Invalid draft data structure, clearing and using initial state')
+              localStorage.removeItem(key)
+              setExerciseStates(init)
+            }
+          } else {
+            // Check for session backup in case of interruption
+            const backupKey = `session-backup:${newWorkoutId}`
+            const backupRaw = localStorage.getItem(backupKey)
+            if (backupRaw) {
+              try {
+                const backup = JSON.parse(backupRaw)
+                if (validateExerciseStates(backup.states, tpl.exercises) && backup.timestamp > Date.now() - 24 * 60 * 60 * 1000) {
+                  console.log('Restoring from session backup')
+                  setExerciseStates(backup.states)
+                  startedAtRef.current = backup.startedAt
+                  setElapsed(Math.floor((Date.now() - backup.startedAt) / 1000))
+                  localStorage.removeItem(backupKey)
+                } else {
+                  setExerciseStates(init)
+                }
+              } catch {
                 setExerciseStates(init)
               }
             } else {
               setExerciseStates(init)
             }
-          } catch (error) {
-            console.error('Failed to restore session draft:', error)
-            localStorage.removeItem(key)
-            setExerciseStates(init)
           }
-        } else {
-          // No workout ID yet, use initial state
+        } catch (error) {
+          console.error('Failed to restore session draft:', error)
+          localStorage.removeItem(key)
           setExerciseStates(init)
         }
+
         exerciseRefs.current = Array.from({ length: tpl.exercises.length }, () => null)
 
         // Timer will be started in a separate effect once template is ready
@@ -179,6 +221,70 @@ export default function SessionPage() {
       restTimersRef.current = {}
     }
   }, [session, templateId])
+
+  // Handle page unload and interruption scenarios
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (workoutId && Object.keys(exerciseStates).length > 0) {
+        // Create emergency backup before page unloads
+        const backupKey = `session-backup:${workoutId}`
+        try {
+          const backup = {
+            states: exerciseStates,
+            startedAt: startedAtRef.current,
+            timestamp: Date.now(),
+            elapsed: elapsed,
+            templateId: templateId,
+            interrupted: true
+          }
+          localStorage.setItem(backupKey, JSON.stringify(backup))
+          console.log('Emergency session backup created')
+        } catch (error) {
+          console.warn('Failed to create emergency backup:', error)
+        }
+      }
+    }
+
+    const handleUnload = () => {
+      // This runs when the page is being unloaded
+      handleBeforeUnload()
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('unload', handleUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('unload', handleUnload)
+    }
+  }, [workoutId, exerciseStates, elapsed, templateId])
+
+  // Session interruption recovery
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && workoutId) {
+        // Page was restored from bfcache, try to restore session
+        const backupKey = `session-backup:${workoutId}`
+        try {
+          const backupRaw = localStorage.getItem(backupKey)
+          if (backupRaw) {
+            const backup = JSON.parse(backupRaw)
+            if (backup.interrupted && backup.timestamp > Date.now() - 60 * 60 * 1000) { // 1 hour
+              console.log('Restoring interrupted session')
+              setExerciseStates(backup.states)
+              startedAtRef.current = backup.startedAt
+              setElapsed(Math.floor((Date.now() - backup.startedAt) / 1000))
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to restore interrupted session:', error)
+        }
+      }
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [workoutId])
 
   // Start/update timer when template is ready. Compute elapsed based on startedAtRef to avoid double increments
   useEffect(() => {
@@ -213,6 +319,55 @@ export default function SessionPage() {
       }
     }
   }, [exerciseStates, workoutId])
+
+  // Handle page visibility changes to pause/resume timer and backup session
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && workoutId && Object.keys(exerciseStates).length > 0) {
+        // Page is hidden, create a backup in case of interruption
+        const backupKey = `session-backup:${workoutId}`
+        try {
+          const backup = {
+            states: exerciseStates,
+            startedAt: startedAtRef.current,
+            timestamp: Date.now(),
+            elapsed: elapsed,
+            templateId: templateId
+          }
+          localStorage.setItem(backupKey, JSON.stringify(backup))
+          console.log('Session backup created')
+        } catch (error) {
+          console.warn('Failed to create session backup:', error)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [workoutId, exerciseStates, elapsed, templateId])
+
+  // Periodic session backup every 30 seconds
+  useEffect(() => {
+    if (!workoutId || Object.keys(exerciseStates).length === 0) return
+
+    const backupInterval = setInterval(() => {
+      const backupKey = `session-backup:${workoutId}`
+      try {
+        const backup = {
+          states: exerciseStates,
+          startedAt: startedAtRef.current,
+          timestamp: Date.now(),
+          elapsed: elapsed,
+          templateId: templateId
+        }
+        localStorage.setItem(backupKey, JSON.stringify(backup))
+      } catch (error) {
+        console.warn('Failed to create periodic backup:', error)
+      }
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(backupInterval)
+  }, [workoutId, exerciseStates, elapsed, templateId])
 
   if (!template) {
     return <SessionSkeleton />
@@ -567,6 +722,20 @@ export default function SessionPage() {
           toast.success('Template salvo!')
         }
       }
+
+      // Clean up session data and backups
+      if (workoutId) {
+        const draftKey = `session-draft:${workoutId}`
+        const backupKey = `session-backup:${workoutId}`
+        try {
+          localStorage.removeItem(draftKey)
+          localStorage.removeItem(backupKey)
+          console.log('Session data cleaned up')
+        } catch (error) {
+          console.warn('Failed to clean up session data:', error)
+        }
+      }
+
       toast.success('Treino finalizado!')
       navigate('/history')
     } catch (e: any) {

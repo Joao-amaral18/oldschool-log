@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { motion } from 'framer-motion'
 import { useModal } from '@/hooks/useModal'
 import ImportWorkoutModal from '@/components/modals/ImportWorkoutModal'
+import { QuickTemplateModal } from '@/components/modals/QuickTemplateModal'
 
 export default function TemplatesPage() {
   const { session } = useAuth()
@@ -21,10 +22,12 @@ export default function TemplatesPage() {
   const [exercises, setExercises] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<'recent' | 'name' | 'favorites'>('recent')
+  const [sort, setSort] = useState<'recent' | 'name' | 'favorites' | 'duration' | 'exercises'>('recent')
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showQuickTemplateModal, setShowQuickTemplateModal] = useState(false)
   const [expandedPreviews, setExpandedPreviews] = useState<Set<string>>(new Set())
+  const [filterBy, setFilterBy] = useState<'all' | 'favorites' | 'recent-week' | 'recent-month'>('all')
   const modal = useModal()
 
   const load = async () => {
@@ -59,7 +62,20 @@ export default function TemplatesPage() {
   }, [session])
 
   const createNew = () => {
-    navigate(`/templates/editor/new`)
+    setShowQuickTemplateModal(true)
+  }
+
+  const handleQuickTemplate = async (templateName: string, exercises: any[]) => {
+    try {
+      // Create template with the selected quick template
+      const template = await api.createTemplateWithExercises(templateName, exercises)
+      setTemplates((prev) => [template, ...prev])
+      toast.success(`Template "${templateName}" criado!`)
+      // Navigate to edit the template
+      navigate(`/templates/editor/${template.id}`)
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao criar template')
+    }
   }
 
   const duplicateTemplate = async (id: string) => {
@@ -157,10 +173,23 @@ export default function TemplatesPage() {
   }
 
   const sortedTemplates = useMemo(() => {
-    const filtered = templates.filter((t) =>
+    let filtered = templates.filter((t) =>
       t.name.toLowerCase().includes(query.toLowerCase())
     )
 
+    // Apply additional filters
+    const now = new Date()
+    if (filterBy === 'favorites') {
+      filtered = filtered.filter(t => favorites.has(t.id))
+    } else if (filterBy === 'recent-week') {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      filtered = filtered.filter(t => new Date(t.created_at) > weekAgo)
+    } else if (filterBy === 'recent-month') {
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      filtered = filtered.filter(t => new Date(t.created_at) > monthAgo)
+    }
+
+    // Apply sorting
     if (sort === 'favorites') {
       return filtered.sort((a, b) => {
         const aIsFav = favorites.has(a.id)
@@ -175,9 +204,21 @@ export default function TemplatesPage() {
       return filtered.sort((a, b) => a.name.localeCompare(b.name))
     }
 
+    if (sort === 'duration') {
+      return filtered.sort((a, b) => {
+        const aDuration = a.exercises.reduce((acc, ex) => acc + (toNumber(ex.restSec) || 60) * toNumber(ex.sets), 0) / 60
+        const bDuration = b.exercises.reduce((acc, ex) => acc + (toNumber(ex.restSec) || 60) * toNumber(ex.sets), 0) / 60
+        return bDuration - aDuration
+      })
+    }
+
+    if (sort === 'exercises') {
+      return filtered.sort((a, b) => b.exercises.length - a.exercises.length)
+    }
+
     // "recent" is the default, which is already sorted by created_at desc
     return filtered
-  }, [templates, query, sort, favorites])
+  }, [templates, query, sort, favorites, filterBy])
 
   if (loading) {
     return <TemplateListSkeleton />
@@ -209,7 +250,7 @@ export default function TemplatesPage() {
                   <Upload className="mr-2 h-4 w-4" /> Importar
                 </Button>
                 <Button onClick={createNew} className="w-full sm:w-auto bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
-                  <Plus className="mr-2 h-4 w-4" /> Criar Template
+                  <Plus className="mr-2 h-4 w-4" /> Começar Template
                 </Button>
               </div>
             </div>
@@ -234,22 +275,61 @@ export default function TemplatesPage() {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="h-11">
-                <Filter className="mr-2 h-4 w-4" />
-                Filtros
-              </Button>
+            <div className="flex gap-2 flex-wrap items-center">
+              <select
+                value={filterBy}
+                onChange={(e) => setFilterBy(e.target.value as 'all' | 'favorites' | 'recent-week' | 'recent-month')}
+                className="h-11 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="all">Todos</option>
+                <option value="favorites">⭐ Favoritos</option>
+                <option value="recent-week">📅 Esta semana</option>
+                <option value="recent-month">📅 Este mês</option>
+              </select>
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value as 'recent' | 'name' | 'favorites')}
-                className="h-11 px-4 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                onChange={(e) => setSort(e.target.value as 'recent' | 'name' | 'favorites' | 'duration' | 'exercises')}
+                className="h-11 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
                 <option value="recent">Mais Recentes</option>
-                <option value="favorites">Favoritos Primeiro</option>
                 <option value="name">Ordem Alfabética</option>
+                <option value="favorites">⭐ Favoritos</option>
+                <option value="duration">⏱️ Duração</option>
+                <option value="exercises">💪 N° Exercícios</option>
               </select>
+              {(filterBy !== 'all' || query) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setQuery('')
+                    setFilterBy('all')
+                    setSort('recent')
+                  }}
+                  className="h-11 px-3 text-muted-foreground hover:text-foreground"
+                >
+                  🗑️ Limpar
+                </Button>
+              )}
             </div>
           </div>
+        </motion.div>
+
+        {/* Stats Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.2 }}
+          className="flex flex-wrap gap-4 text-sm text-muted-foreground"
+        >
+          <span>{sortedTemplates.length} template{sortedTemplates.length !== 1 ? 's' : ''}</span>
+          {favorites.size > 0 && <span>⭐ {favorites.size} favorito{favorites.size !== 1 ? 's' : ''}</span>}
+          {sortedTemplates.length > 0 && (
+            <>
+              <span>⏱️ ~{Math.round(sortedTemplates.reduce((acc, t) => acc + t.exercises.reduce((acc, ex) => acc + (toNumber(ex.restSec) || 60) * toNumber(ex.sets), 0) / 60, 0) / sortedTemplates.length)}min médio</span>
+              <span>💪 {Math.round(sortedTemplates.reduce((acc, t) => acc + t.exercises.length, 0) / sortedTemplates.length)} exercícios médio</span>
+            </>
+          )}
         </motion.div>
 
         {/* Templates Grid */}
@@ -488,6 +568,14 @@ export default function TemplatesPage() {
           <ImportWorkoutModal
             onClose={() => setShowImportModal(false)}
             onImport={handleImportTemplates}
+          />
+        )}
+
+        {showQuickTemplateModal && (
+          <QuickTemplateModal
+            open={showQuickTemplateModal}
+            onClose={() => setShowQuickTemplateModal(false)}
+            onSelectTemplate={handleQuickTemplate}
           />
         )}
       </div>
