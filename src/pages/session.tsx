@@ -19,7 +19,6 @@ import { sessionStorage, type SessionState, type ExerciseLocalState } from '@/li
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { SessionSkeleton } from '@/components/skeletons'
 import { SwipeableSet } from '@/components/ui/swipeable-set'
-import { SyncDebugger } from '@/components/debug/SyncDebugger'
 
 
 // Types are now imported from sessionStorage
@@ -48,7 +47,7 @@ const validateExerciseStates = (states: Record<string, ExerciseLocalState>, temp
       if (!set || typeof set !== 'object') return false
       if (typeof set.id !== 'number') return false
       if (typeof set.reps !== 'string') return false
-      if (typeof set.load !== 'string') return false
+      if (typeof set.load !== 'string' && typeof set.load !== 'number') return false
       if (typeof set.isCompleted !== 'boolean') return false
 
       // Additional validation for set values
@@ -1212,8 +1211,7 @@ export default function SessionPage() {
         </div>
       )}
 
-      {/* Debug component - remove after fixing sync issues */}
-      <SyncDebugger workoutId={workoutId} />
+
     </motion.div>
   )
 }

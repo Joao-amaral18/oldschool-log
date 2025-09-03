@@ -429,7 +429,7 @@ export const api = {
                     id,
                     workout_id,
                     exercise_id,
-                    exercises!inner(id, name, muscle_group)
+                    exercises(id, name, muscle_group)
                 `)
                 .in('workout_id', ids)
 
