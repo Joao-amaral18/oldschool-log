@@ -793,15 +793,31 @@ export default function SessionPage() {
           placeholder: 'Ex: Treino Push - Avançado',
         })
         if (templateName?.trim()) {
-          // Build averaged exercises from performedSetsState
-          const averaged: TemplateExercise[] = template.exercises.map((te, idx) => {
-            const sets = performedSetsState[idx]
-            const avgLoad = sets.length > 0 ? Math.round(sets.reduce((s, x) => s + x.load, 0) / sets.length) : te.load
-            const avgReps = sets.length > 0 ? Math.round(sets.reduce((s, x) => s + (typeof x.reps === 'number' ? x.reps : parseInt(String(x.reps)) || 0), 0) / sets.length) : (typeof te.reps === 'number' ? te.reps : parseInt(String(te.reps)) || 10)
-            return { ...te, id: crypto.randomUUID(), load: avgLoad, reps: avgReps, sets: Math.max(sets.length, typeof te.sets === 'number' ? te.sets : parseInt(String(te.sets)) || 1) }
-          })
-          await api.createTemplateWithExercises(templateName.trim(), averaged)
-          toast.success('Template salvo!')
+          try {
+            const averaged: TemplateExercise[] = template.exercises.map((te, idx) => {
+              const sets = performedSetsState[idx] || []
+              const avgLoad = sets.length > 0
+                ? Math.round(sets.reduce((s, x) => s + (x.load || 0), 0) / sets.length)
+                : (typeof te.load === 'number' ? te.load : parseFloat(String(te.load)) || 0)
+              const avgReps = sets.length > 0
+                ? Math.round(sets.reduce((s, x) => s + (typeof x.reps === 'number' ? x.reps : parseInt(String(x.reps)) || 0), 0) / sets.length)
+                : (typeof te.reps === 'number' ? te.reps : parseInt(String(te.reps)) || 10)
+              const setsCount = Math.max(sets.length, typeof te.sets === 'number' ? te.sets : parseInt(String(te.sets)) || 1)
+
+              return {
+                ...te,
+                id: crypto.randomUUID(),
+                load: avgLoad,
+                reps: avgReps,
+                sets: setsCount
+              }
+            })
+
+            await api.createTemplateWithExercises(templateName.trim(), averaged)
+            toast.success('Template salvo!')
+          } catch (error) {
+            toast.error(`Erro ao salvar template: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
+          }
         }
       }
 

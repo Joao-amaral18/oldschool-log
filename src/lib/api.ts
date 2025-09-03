@@ -147,31 +147,51 @@ export const api = {
         return { id: t.id, name: t.name, created_at: t.created_at, exercises: (tex || []).map(mapTemplateExerciseRow) }
     },
     async createTemplate(name: string): Promise<WorkoutTemplate> {
+
         const { data: user } = await supabase.auth.getUser();
-        if (!user?.user) throw new Error('User not authenticated');
+        if (!user?.user) {
+            throw new Error('User not authenticated')
+        }
+
+        console.log('User authenticated:', user.user.id)
 
         const { data, error } = await supabase
             .from('templates')
             .insert({ name, user_id: user.user.id })
             .select('*')
             .single()
-        if (error) throw error
+
+        if (error) {
+            throw error
+        }
+
+        console.log('Template created successfully:', data.id)
         return { id: data.id, name: data.name, created_at: data.created_at, exercises: [] }
     },
     async createTemplateWithExercises(name: string, exercises: TemplateExercise[]) {
+        console.log('Creating template:', name, 'with', exercises.length, 'exercises')
+
         const t = await api.createTemplate(name)
+        console.log('Template created:', t.id)
+
         if (exercises.length > 0) {
             const payload = exercises.map((e, idx) => ({
                 template_id: t.id,
                 exercise_id: e.exerciseId,
                 position: idx,
-                sets: e.sets,
-                reps: e.reps,
-                load: e.load,
-                rest_sec: e.restSec,
+                sets: typeof e.sets === 'number' ? e.sets : parseInt(String(e.sets)) || 1,
+                reps: typeof e.reps === 'number' ? e.reps : parseInt(String(e.reps)) || 10,
+                load: typeof e.load === 'number' ? e.load : parseFloat(String(e.load)) || 0,
+                rest_sec: typeof e.restSec === 'number' ? e.restSec : parseInt(String(e.restSec)) || 60,
             }))
+
+
             const { error } = await supabase.from('template_exercises').insert(payload)
-            if (error) throw error
+            if (error) {
+                throw error
+            }
+
+            console.log('Template exercises inserted successfully')
             t.exercises = exercises
         }
         return t
