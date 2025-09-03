@@ -3,11 +3,25 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Plugin to inject environment variables into service worker
+const injectSWEnvPlugin = () => ({
+  name: 'inject-sw-env',
+  generateBundle(options, bundle) {
+    const swFile = bundle['sw.js']
+    if (swFile && 'code' in swFile) {
+      swFile.code = swFile.code
+        .replace('self.VITE_SUPABASE_URL', `"${process.env.VITE_SUPABASE_URL}"`)
+        .replace('self.VITE_SUPABASE_ANON_KEY', `"${process.env.VITE_SUPABASE_ANON_KEY}"`)
+    }
+  }
+})
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    injectSWEnvPlugin(),
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',

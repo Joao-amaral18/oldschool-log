@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { UserSession } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { saveAuthSessionForSync } from '@/lib/offlineQueue';
 
 interface AuthContextValue {
   session: UserSession | null;
@@ -39,9 +40,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const user = session?.user
       const next = user ? { userId: user.id, username: user.user_metadata?.username || 'Guest' } : null
       setSession(next)
-      // 2) Mirror to localStorage for quick boot
+      // 2) Mirror to localStorage for quick boot and IndexedDB for service worker
       try {
         localStorage.setItem('auth:session', next ? JSON.stringify(next) : '')
+        if (next) {
+          saveAuthSessionForSync(next).catch(console.error)
+        }
       } catch { }
       setInitialized(true)
     })
@@ -54,6 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(next)
       try {
         localStorage.setItem('auth:session', next ? JSON.stringify(next) : '')
+        if (next) {
+          saveAuthSessionForSync(next).catch(console.error)
+        }
       } catch { }
       setInitialized(true)
     })
@@ -69,7 +76,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const user = data.user;
     const next = user ? { userId: user.id, username: user.user_metadata?.username || 'Guest' } : null
     setSession(next);
-    try { localStorage.setItem('auth:session', next ? JSON.stringify(next) : '') } catch { }
+    try { 
+      localStorage.setItem('auth:session', next ? JSON.stringify(next) : '')
+      if (next) {
+        saveAuthSessionForSync(next).catch(console.error)
+      }
+    } catch { }
   };
 
   const signup = async (email: string, password: string, username: string) => {
@@ -84,7 +96,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const user = data.user;
     const next = user ? { userId: user.id, username } : null
     setSession(next);
-    try { localStorage.setItem('auth:session', next ? JSON.stringify(next) : '') } catch { }
+    try { 
+      localStorage.setItem('auth:session', next ? JSON.stringify(next) : '')
+      if (next) {
+        saveAuthSessionForSync(next).catch(console.error)
+      }
+    } catch { }
   };
 
   const logout = async () => {

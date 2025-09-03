@@ -1,8 +1,9 @@
 /*
-  Minimal IndexedDB queue for offline performed sets
+  Enhanced IndexedDB queue for offline performed sets with background sync
 */
 
 import type { PerformedSet } from '@/types'
+import { set as idbSet, get as idbGet } from 'idb-keyval'
 
 type QueueItem = {
     endpoint?: string
@@ -11,6 +12,9 @@ type QueueItem = {
     performedExerciseId?: string
     set?: PerformedSet
 }
+
+const SYNC_TAG_SETS = 'sync-training-sets'
+const SYNC_TAG_SESSION = 'sync-training-session'
 
 function openDb(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
@@ -33,16 +37,44 @@ export async function enqueueSet(item: QueueItem) {
         tx.oncomplete = () => resolve()
         tx.onerror = () => reject(tx.error)
     })
+    
+    // Immediately try to register background sync
+    await registerSync()
 }
 
 export async function registerSync() {
     if ('serviceWorker' in navigator && 'SyncManager' in window) {
         try {
             const reg = await navigator.serviceWorker.ready
-            await (reg as any).sync?.register('sync-sets')
-        } catch {
-            // no-op
+            await (reg as any).sync?.register(SYNC_TAG_SETS)
+            console.log('Background sync registered for training sets')
+        } catch (error) {
+            console.warn('Failed to register background sync:', error)
         }
+    }
+}
+
+export async function registerSessionSync() {
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            const reg = await navigator.serviceWorker.ready
+            await (reg as any).sync?.register(SYNC_TAG_SESSION)
+            console.log('Background sync registered for training session')
+        } catch (error) {
+            console.warn('Failed to register session sync:', error)
+        }
+    }
+}
+
+/**
+ * Save auth session to IndexedDB for service worker access
+ */
+export async function saveAuthSessionForSync(session: { userId: string; username: string }) {
+    try {
+        await idbSet('auth-session', session)
+        console.log('Auth session saved for background sync')
+    } catch (error) {
+        console.error('Failed to save auth session for sync:', error)
     }
 }
 

@@ -14,12 +14,14 @@ import { toast } from 'sonner'
 import { X, Plus, Minus, ChevronDown, Timer, Circle, CheckCircle2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { audioUtils } from '@/lib/notifications'
-import { enqueueSet, registerSync } from '@/lib/offlineQueue'
+import { enqueueSet, registerSync, registerSessionSync } from '@/lib/offlineQueue'
+import { sessionStorage, type SessionState, type ExerciseLocalState, type LocalSet } from '@/lib/sessionStorage'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { SessionSkeleton } from '@/components/skeletons'
 import { SwipeableSet } from '@/components/ui/swipeable-set'
 
-type LocalSet = { id: number; reps: string; load: string; isCompleted: boolean }
-type ExerciseLocalState = { sets: LocalSet[]; isCompleted: boolean }
+
+// Types are now imported from sessionStorage
 
 // Enhanced validation function for exercise states
 const validateExerciseStates = (states: Record<string, ExerciseLocalState>, templateExercises: any[]): boolean => {
@@ -77,6 +79,23 @@ export default function SessionPage() {
   const [workoutId, setWorkoutId] = useState<string>('')
   const performedExerciseIdsRef = useRef<string[]>([])
   const restTimersRef = useRef<Record<string, { remaining: number; total: number; intervalId?: number; wasInterrupted?: boolean }>>({})
+
+  // Realtime sync setup
+  const { triggerSync } = useRealtimeSync({
+    workoutId,
+    onSessionUpdate: (payload) => {
+      console.log('Session updated via realtime:', payload)
+      // Handle session updates if needed
+    },
+    onSetUpdate: (payload) => {
+      console.log('Set updated via realtime:', payload)
+      // Optionally refresh performed sets state
+    },
+    onConflictDetected: (payload) => {
+      console.warn('Sync conflict detected:', payload)
+      // Handle conflicts (e.g., show warning to user)
+    }
+  })
 
   // Initialize session
   useEffect(() => {
@@ -148,49 +167,35 @@ export default function SessionPage() {
           }
         }
 
-        // Try to restore draft if present (AFTER workoutId is set)
-        const key = `session-draft:${newWorkoutId}`
+        // Try to restore session from IndexedDB
         try {
-          const raw = localStorage.getItem(key)
-          if (raw) {
-            const saved = JSON.parse(raw) as Record<string, ExerciseLocalState>
-            // Enhanced validation for draft data
-            const isValid = validateExerciseStates(saved, tpl.exercises)
-
-            if (isValid) {
-              console.log('Restoring session draft:', Object.keys(saved).length, 'exercises')
-              setExerciseStates(saved)
-            } else {
-              console.warn('Invalid draft data structure, clearing and using initial state')
-              localStorage.removeItem(key)
-              setExerciseStates(init)
+          const savedSession = await sessionStorage.loadSession(newWorkoutId)
+          if (savedSession && validateExerciseStates(savedSession.exerciseStates, tpl.exercises)) {
+            console.log('Restoring session from IndexedDB:', Object.keys(savedSession.exerciseStates).length, 'exercises')
+            setExerciseStates(savedSession.exerciseStates)
+            startedAtRef.current = savedSession.startedAt
+            setElapsed(Math.floor((Date.now() - savedSession.startedAt) / 1000))
+            performedExerciseIdsRef.current = savedSession.performedExerciseIds || performedExerciseIdsRef.current
+            
+            // Restore active rest timers if any
+            if (savedSession.activeRestTimers) {
+              setActiveRestTimers(savedSession.activeRestTimers)
+              restTimersRef.current = savedSession.activeRestTimers
             }
           } else {
-            // Check for session backup in case of interruption
-            const backupKey = `session-backup:${newWorkoutId}`
-            const backupRaw = localStorage.getItem(backupKey)
-            if (backupRaw) {
-              try {
-                const backup = JSON.parse(backupRaw)
-                if (validateExerciseStates(backup.states, tpl.exercises) && backup.timestamp > Date.now() - 24 * 60 * 60 * 1000) {
-                  console.log('Restoring from session backup')
-                  setExerciseStates(backup.states)
-                  startedAtRef.current = backup.startedAt
-                  setElapsed(Math.floor((Date.now() - backup.startedAt) / 1000))
-                  localStorage.removeItem(backupKey)
-                } else {
-                  setExerciseStates(init)
-                }
-              } catch {
-                setExerciseStates(init)
-              }
+            // Try emergency backup recovery
+            const emergencyBackup = await sessionStorage.recoverFromEmergencyBackup(newWorkoutId)
+            if (emergencyBackup && validateExerciseStates(emergencyBackup.exerciseStates, tpl.exercises)) {
+              console.log('Restoring from emergency backup')
+              setExerciseStates(emergencyBackup.exerciseStates)
+              startedAtRef.current = emergencyBackup.startedAt
+              setElapsed(Math.floor((Date.now() - emergencyBackup.startedAt) / 1000))
             } else {
               setExerciseStates(init)
             }
           }
         } catch (error) {
-          console.error('Failed to restore session draft:', error)
-          localStorage.removeItem(key)
+          console.error('Failed to restore session from IndexedDB:', error)
           setExerciseStates(init)
         }
 
@@ -205,6 +210,7 @@ export default function SessionPage() {
     boot()
     // Ensure background sync is registered when session page is active
     registerSync()
+    registerSessionSync()
     return () => {
       if (timerRef.current) {
         window.clearInterval(timerRef.current)
@@ -219,6 +225,12 @@ export default function SessionPage() {
         }
       })
       restTimersRef.current = {}
+
+      // Clean up save timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
+      }
     }
   }, [session, templateId])
 
@@ -227,21 +239,22 @@ export default function SessionPage() {
     const handleBeforeUnload = () => {
       if (workoutId && Object.keys(exerciseStates).length > 0) {
         // Create emergency backup before page unloads
-        const backupKey = `session-backup:${workoutId}`
-        try {
-          const backup = {
-            states: exerciseStates,
-            startedAt: startedAtRef.current,
-            timestamp: Date.now(),
-            elapsed: elapsed,
-            templateId: templateId,
-            interrupted: true
-          }
-          localStorage.setItem(backupKey, JSON.stringify(backup))
-          console.log('Emergency session backup created')
-        } catch (error) {
-          console.warn('Failed to create emergency backup:', error)
+        const sessionState: SessionState = {
+          workoutId,
+          templateId: templateId!,
+          exerciseStates,
+          startedAt: startedAtRef.current,
+          elapsed,
+          timestamp: Date.now(),
+          performedExerciseIds: performedExerciseIdsRef.current,
+          activeRestTimers: activeRestTimers
         }
+        
+        // Use synchronous method for emergency backup (page unload is immediate)
+        sessionStorage.createEmergencyBackup(sessionState).catch(error => {
+          console.warn('Failed to create emergency backup:', error)
+        })
+        console.log('Emergency session backup created')
       }
     }
 
@@ -308,66 +321,91 @@ export default function SessionPage() {
     }
   }, [template?.id])
 
-  // Persist drafts per workout (must come before any conditional return)
-  useEffect(() => {
-    if (workoutId && Object.keys(exerciseStates).length > 0) {
-      const key = `session-draft:${workoutId}`
-      try {
-        localStorage.setItem(key, JSON.stringify(exerciseStates))
-      } catch (error) {
-        console.warn('Failed to save session draft:', error)
-      }
-    }
-  }, [exerciseStates, workoutId])
+  // Consolidated session persistence with simple throttling
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastSaveTimeRef = useRef<number>(0)
 
-  // Handle page visibility changes to pause/resume timer and backup session
+  const saveSessionThrottled = useCallback(async (
+    workoutId: string,
+    templateId: string,
+    exerciseStates: Record<string, ExerciseLocalState>,
+    elapsed: number,
+    activeRestTimers: Record<string, any>
+  ) => {
+    if (!workoutId || Object.keys(exerciseStates).length === 0 || !templateId) return
+
+    const now = Date.now()
+    // Throttle saves to once per second
+    if (now - lastSaveTimeRef.current < 1000) {
+      // Clear existing timeout and schedule new one
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+      saveTimeoutRef.current = setTimeout(() => {
+        saveSessionThrottled(workoutId, templateId, exerciseStates, elapsed, activeRestTimers)
+      }, 1000 - (now - lastSaveTimeRef.current))
+      return
+    }
+
+    lastSaveTimeRef.current = now
+
+    const sessionState: SessionState = {
+      workoutId,
+      templateId,
+      exerciseStates,
+      startedAt: startedAtRef.current,
+      elapsed,
+      timestamp: Date.now(),
+      performedExerciseIds: performedExerciseIdsRef.current,
+      activeRestTimers: activeRestTimers
+    }
+
+    try {
+      await sessionStorage.saveSession(sessionState)
+      // Register session sync for background sync (only on state changes, not periodic)
+      await registerSessionSync()
+    } catch (error) {
+      console.warn('Failed to save session state:', error)
+    }
+  }, [])
+
+  // Single useEffect for all session persistence
+  useEffect(() => {
+    if (workoutId && templateId) {
+      saveSessionThrottled(workoutId, templateId, exerciseStates, elapsed, activeRestTimers)
+    }
+  }, [exerciseStates, workoutId, templateId, elapsed, activeRestTimers, saveSessionThrottled])
+
+  // Handle page visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden && workoutId && Object.keys(exerciseStates).length > 0) {
-        // Page is hidden, create a backup in case of interruption
-        const backupKey = `session-backup:${workoutId}`
-        try {
-          const backup = {
-            states: exerciseStates,
-            startedAt: startedAtRef.current,
-            timestamp: Date.now(),
-            elapsed: elapsed,
-            templateId: templateId
-          }
-          localStorage.setItem(backupKey, JSON.stringify(backup))
-          console.log('Session backup created')
-        } catch (error) {
-          console.warn('Failed to create session backup:', error)
+      if (document.hidden && workoutId && templateId && Object.keys(exerciseStates).length > 0) {
+        // Immediate save when page becomes hidden
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current)
+          saveTimeoutRef.current = null
         }
+        const sessionState: SessionState = {
+          workoutId,
+          templateId,
+          exerciseStates,
+          startedAt: startedAtRef.current,
+          elapsed,
+          timestamp: Date.now(),
+          performedExerciseIds: performedExerciseIdsRef.current,
+          activeRestTimers: activeRestTimers
+        }
+
+        sessionStorage.saveSession(sessionState).catch(error => {
+          console.warn('Failed to create visibility backup:', error)
+        })
+        console.log('Session backup created on visibility change')
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [workoutId, exerciseStates, elapsed, templateId])
-
-  // Periodic session backup every 30 seconds
-  useEffect(() => {
-    if (!workoutId || Object.keys(exerciseStates).length === 0) return
-
-    const backupInterval = setInterval(() => {
-      const backupKey = `session-backup:${workoutId}`
-      try {
-        const backup = {
-          states: exerciseStates,
-          startedAt: startedAtRef.current,
-          timestamp: Date.now(),
-          elapsed: elapsed,
-          templateId: templateId
-        }
-        localStorage.setItem(backupKey, JSON.stringify(backup))
-      } catch (error) {
-        console.warn('Failed to create periodic backup:', error)
-      }
-    }, 30000) // 30 seconds
-
-    return () => clearInterval(backupInterval)
-  }, [workoutId, exerciseStates, elapsed, templateId])
+  }, [workoutId, exerciseStates, elapsed, templateId, activeRestTimers])
 
   if (!template) {
     return <SessionSkeleton />
@@ -723,14 +761,11 @@ export default function SessionPage() {
         }
       }
 
-      // Clean up session data and backups
+      // Clean up session data from IndexedDB and localStorage
       if (workoutId) {
-        const draftKey = `session-draft:${workoutId}`
-        const backupKey = `session-backup:${workoutId}`
         try {
-          localStorage.removeItem(draftKey)
-          localStorage.removeItem(backupKey)
-          console.log('Session data cleaned up')
+          await sessionStorage.clearSession(workoutId)
+          console.log('Session data cleaned up from IndexedDB')
         } catch (error) {
           console.warn('Failed to clean up session data:', error)
         }
