@@ -18,6 +18,11 @@ const injectSWEnvPlugin = () => ({
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    hmr: {
+      overlay: false
+    }
+  },
   plugins: [
     react(),
     tailwindcss(),

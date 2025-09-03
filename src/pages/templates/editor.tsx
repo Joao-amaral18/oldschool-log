@@ -92,28 +92,52 @@ export default function TemplateEditorPage() {
     if (id) load()
   }, [session, id])
 
-  // Broadcast state to MobileHeader and listen for header actions
   useEffect(() => {
     const canSave = !loading && !!template?.name?.trim() && (template?.exercises?.length ?? 0) > 0 &&
       !(template?.exercises?.some((e) => !e.exerciseId || (setRowsByExercise[e.id]?.length === 0)))
-    // Dispatch minimal state even if template not loaded yet
-    window.dispatchEvent(new CustomEvent('template:state', { detail: { name: template?.name ?? '', canSave: !!canSave } }))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    try {
+      window.dispatchEvent(new CustomEvent('template:state', {
+        detail: { name: template?.name ?? '', canSave: !!canSave }
+      }))
+    } catch (error) {
+      console.warn('Failed to dispatch template state event:', error)
+    }
   }, [loading, template, setRowsByExercise])
 
   useEffect(() => {
-    const onSave = () => { void saveTemplate() }
+    const onSave = () => {
+      try {
+        void saveTemplate()
+      } catch (error) {
+        console.error('Error saving template:', error)
+      }
+    }
+
     const onSetName = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { name: string }
-      if (typeof detail?.name === 'string') setName(detail.name)
+      try {
+        const detail = (e as CustomEvent).detail as { name: string }
+        if (typeof detail?.name === 'string') setName(detail.name)
+      } catch (error) {
+        console.error('Error setting template name:', error)
+      }
     }
-    window.addEventListener('template:save', onSave)
-    window.addEventListener('template:setName', onSetName as EventListener)
+
+    try {
+      window.addEventListener('template:save', onSave)
+      window.addEventListener('template:setName', onSetName as EventListener)
+    } catch (error) {
+      console.warn('Failed to add event listeners:', error)
+    }
+
     return () => {
-      window.removeEventListener('template:save', onSave)
-      window.removeEventListener('template:setName', onSetName as EventListener)
+      try {
+        window.removeEventListener('template:save', onSave)
+        window.removeEventListener('template:setName', onSetName as EventListener)
+      } catch (error) {
+        console.warn('Failed to remove event listeners:', error)
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading || !template) {
