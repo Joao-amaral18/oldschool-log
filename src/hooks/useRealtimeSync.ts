@@ -65,7 +65,6 @@ export function useRealtimeSync(options: RealtimeSyncOptions = {}) {
     let setsChannel: any = null
     let workoutChannel: any = null
     let presenceChannel: any = null
-    let isSubscribed = false
 
     const setupSubscriptions = async () => {
       try {
@@ -93,9 +92,6 @@ export function useRealtimeSync(options: RealtimeSyncOptions = {}) {
           )
           .subscribe((status: string) => {
             console.log('Sets channel status:', status)
-            if (status === 'SUBSCRIBED') {
-              isSubscribed = true
-            }
           })
 
         // Subscribe to workout_histories changes

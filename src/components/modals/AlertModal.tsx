@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { AlertTriangle, Info, XCircle } from 'lucide-react'
 import type { AlertModalProps } from './types'
-import { useEffect, useState } from 'react'
+
 
 export function AlertModal({
     open,

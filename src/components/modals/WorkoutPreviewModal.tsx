@@ -3,14 +3,12 @@ import { Link } from 'react-router-dom'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+
 import {
     Clock,
     Target,
     Dumbbell,
-    Zap,
-    Flame,
-    Heart,
+
     Play,
     ArrowRight,
     Timer,
@@ -51,28 +49,9 @@ export function WorkoutPreviewModal({ open, onClose, workout, exercises }: Worko
     const totalVolume = workout.exercises.reduce((sum, ex) => sum + (toNumber(ex.sets) * toNumber(ex.reps) * ex.load), 0)
     const totalSets = workout.exercises.reduce((sum, ex) => sum + toNumber(ex.sets), 0)
 
-    const calculateDifficulty = (template: WorkoutTemplate) => {
-        const totalVolume = template.exercises.reduce((sum, ex) =>
-            sum + (toNumber(ex.sets) * toNumber(ex.reps) * ex.load), 0)
-        const avgRest = template.exercises.reduce((sum, ex) => sum + toNumber(ex.restSec), 0) / template.exercises.length
 
-        if (totalVolume > 10000 || avgRest < 60) return 'hard'
-        if (totalVolume > 5000 || avgRest < 120) return 'medium'
-        return 'easy'
-    }
 
-    const getDifficultyInfo = (difficulty: string) => {
-        switch (difficulty) {
-            case 'hard': return { label: 'Avançado', color: 'bg-red-500', icon: Flame }
-            case 'medium': return { label: 'Intermediário', color: 'bg-yellow-500', icon: Zap }
-            case 'easy': return { label: 'Iniciante', color: 'bg-green-500', icon: Heart }
-            default: return { label: 'Iniciante', color: 'bg-green-500', icon: Heart }
-        }
-    }
 
-    const difficulty = calculateDifficulty(workout)
-    const difficultyInfo = getDifficultyInfo(difficulty)
-    const DifficultyIcon = difficultyInfo.icon
 
     const toggleExerciseExpansion = (exerciseId: string) => {
         const newExpanded = new Set(expandedExercises)

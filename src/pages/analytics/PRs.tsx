@@ -4,19 +4,9 @@ import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
 import { Award, TrendingUp, Calendar, Target } from 'lucide-react'
+import type { EnrichedWorkoutHistory } from '@/types'
 
-interface WorkoutHistory {
-    id: string
-    startedAt: string
-    exercises?: Array<{
-        exerciseId: string
-        sets: Array<{
-            weight?: number
-            reps?: number
-            restSec?: number
-        }>
-    }>
-}
+
 
 interface Exercise {
     id: string
@@ -37,7 +27,7 @@ interface PersonalRecord {
 }
 
 export default function PRsPage() {
-    const [histories, setHistories] = useState<WorkoutHistory[]>([])
+    const [histories, setHistories] = useState<EnrichedWorkoutHistory[]>([])
     const [exercises, setExercises] = useState<Exercise[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -71,7 +61,7 @@ export default function PRsPage() {
             if (!workout.exercises) return
 
             workout.exercises.forEach(exerciseData => {
-                const exercise = exercises.find(e => e.id === exerciseData.exerciseId)
+                const exercise = exercises.find(e => e.id === exerciseData.id)
                 if (!exercise || exerciseData.sets.length === 0) return
 
                 const workoutDate = new Date(workout.startedAt).toISOString().split('T')[0]
@@ -83,8 +73,8 @@ export default function PRsPage() {
                 let totalVolume = 0
 
                 exerciseData.sets.forEach(set => {
-                    const weight = set.weight || 0
-                    const reps = set.reps || 0
+                    const weight = set.load || 0
+                    const reps = parseInt(set.reps || '0')
                     const volume = weight * reps
 
                     maxWeight = Math.max(maxWeight, weight)

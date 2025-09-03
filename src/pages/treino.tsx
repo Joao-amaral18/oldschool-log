@@ -8,10 +8,10 @@ import {
     Dumbbell,
     Clock,
     Target,
-    TrendingUp,
+
     Zap,
     Flame,
-    Heart,
+
     Star,
     BarChart3,
     Play,
@@ -49,7 +49,7 @@ export default function TreinoPage() {
     const [sortBy, setSortBy] = useState<'recent' | 'name' | 'exercises' | 'difficulty'>('recent')
     const [filterBy, setFilterBy] = useState<'all' | 'favorites'>('all')
     const [favorites, setFavorites] = useState<Set<string>>(new Set())
-    const [showMotivation, setShowMotivation] = useState(true)
+
     const [previewWorkout, setPreviewWorkout] = useState<WorkoutTemplate | null>(null)
     const [showPreviewModal, setShowPreviewModal] = useState(false)
 
@@ -121,28 +121,7 @@ export default function TreinoPage() {
         return filtered
     }, [templates, query, sortBy, filterBy, favorites])
 
-    const workoutStats = useMemo(() => {
-        if (!filteredAndSorted.length) return null
 
-        const totalWorkouts = filteredAndSorted.length
-        const totalExercises = filteredAndSorted.reduce((sum, t) => sum + t.exercises.length, 0)
-        const avgExercises = Math.round(totalExercises / totalWorkouts)
-
-        const totalVolume = filteredAndSorted.reduce((sum, t) =>
-            sum + t.exercises.reduce((exSum, ex) =>
-                exSum + (toNumber(ex.sets) * toNumber(ex.reps) * ex.load), 0), 0)
-
-        const avgDuration = Math.round(filteredAndSorted.reduce((sum, t) =>
-            sum + t.exercises.reduce((exSum, ex) =>
-                exSum + (toNumber(ex.sets) * toNumber(ex.restSec)), 0), 0) / totalWorkouts / 60)
-
-        return {
-            totalWorkouts,
-            avgExercises,
-            totalVolume: Math.round(totalVolume),
-            avgDuration
-        }
-    }, [filteredAndSorted])
 
     const toggleFavorite = (workoutId: string) => {
         if (!session?.userId) return
@@ -167,33 +146,11 @@ export default function TreinoPage() {
         setPreviewWorkout(null)
     }
 
-    const calculateWorkoutDifficulty = (template: WorkoutTemplate) => {
-        const totalVolume = template.exercises.reduce((sum, ex) =>
-            sum + (toNumber(ex.sets) * toNumber(ex.reps) * ex.load), 0)
-        const avgRest = template.exercises.reduce((sum, ex) => sum + toNumber(ex.restSec), 0) / template.exercises.length
 
-        if (totalVolume > 10000 || avgRest < 60) return 'hard'
-        if (totalVolume > 5000 || avgRest < 120) return 'medium'
-        return 'easy'
-    }
 
-    const getDifficultyColor = (difficulty: string) => {
-        switch (difficulty) {
-            case 'hard': return 'from-red-500 to-red-600'
-            case 'medium': return 'from-yellow-500 to-yellow-600'
-            case 'easy': return 'from-green-500 to-green-600'
-            default: return 'from-gray-500 to-gray-600'
-        }
-    }
 
-    const getDifficultyIcon = (difficulty: string) => {
-        switch (difficulty) {
-            case 'hard': return Flame
-            case 'medium': return Zap
-            case 'easy': return Heart
-            default: return Target
-        }
-    }
+
+
 
     if (isLoading) return <Skeleton />
     if (isError || !templates)
@@ -445,8 +402,8 @@ export default function TreinoPage() {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredAndSorted.map((template, idx) => {
-                                const difficulty = calculateWorkoutDifficulty(template)
-                                const DifficultyIcon = getDifficultyIcon(difficulty)
+
+
                                 const estimatedDuration = Math.round(template.exercises.reduce((sum, ex) => sum + (toNumber(ex.sets) * toNumber(ex.restSec)), 0) / 60)
                                 const totalVolume = template.exercises.reduce((sum, ex) => sum + (toNumber(ex.sets) * toNumber(ex.reps) * ex.load), 0)
 

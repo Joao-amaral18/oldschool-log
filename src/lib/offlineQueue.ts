@@ -3,7 +3,7 @@
 */
 
 import type { PerformedSet } from '@/types'
-import { set as idbSet, get as idbGet } from 'idb-keyval'
+import { set as idbSet } from 'idb-keyval'
 
 type QueueItem = {
     endpoint?: string

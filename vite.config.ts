@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Plugin to inject environment variables into service worker
 const injectSWEnvPlugin = () => ({
   name: 'inject-sw-env',
-  generateBundle(options, bundle) {
+  generateBundle(_options: any, bundle: any) {
     const swFile = bundle['sw.js']
     if (swFile && 'code' in swFile) {
       swFile.code = swFile.code

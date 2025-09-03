@@ -58,3 +58,27 @@ export type WorkoutHistory = {
     durationSec: number | null
     exercises: PerformedExercise[]
 }
+
+export type EnrichedWorkoutHistory = {
+    id: string
+    templateName: string | null
+    startedAt: string
+    finishedAt: string | null
+    durationSec: number | null
+    totalSets: number
+    totalVolume: number
+    exercises: Array<{
+        id: string
+        exerciseId?: string
+        name: string
+        muscleGroup: string
+        sets: Array<{
+            reps: string
+            load: number | null
+            weight?: number
+            kind: 'warmup' | 'recognition' | 'working'
+            doneAt: string
+        }>
+    }>
+    notes?: string
+}

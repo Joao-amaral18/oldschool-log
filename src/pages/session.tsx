@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/context/AuthContext'
@@ -15,7 +15,7 @@ import { X, Plus, Minus, ChevronDown, Timer, Circle, CheckCircle2 } from 'lucide
 import { api } from '@/lib/api'
 import { audioUtils } from '@/lib/notifications'
 import { enqueueSet, registerSync, registerSessionSync } from '@/lib/offlineQueue'
-import { sessionStorage, type SessionState, type ExerciseLocalState, type LocalSet } from '@/lib/sessionStorage'
+import { sessionStorage, type SessionState, type ExerciseLocalState } from '@/lib/sessionStorage'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { SessionSkeleton } from '@/components/skeletons'
 import { SwipeableSet } from '@/components/ui/swipeable-set'
@@ -35,8 +35,8 @@ const validateExerciseStates = (states: Record<string, ExerciseLocalState>, temp
     return false
   }
 
-  // Validate each exercise state
-  return Object.entries(states).every(([exerciseId, exerciseState]) => {
+      // Validate each exercise state
+    return Object.entries(states).every(([, exerciseState]) => {
     // Check exercise state structure
     if (!exerciseState || typeof exerciseState !== 'object') return false
     if (typeof exerciseState.isCompleted !== 'boolean') return false
@@ -81,7 +81,7 @@ export default function SessionPage() {
   const restTimersRef = useRef<Record<string, { remaining: number; total: number; intervalId?: number; wasInterrupted?: boolean }>>({})
 
   // Realtime sync setup
-  const { triggerSync } = useRealtimeSync({
+  useRealtimeSync({
     workoutId,
     onSessionUpdate: (payload) => {
       console.log('Session updated via realtime:', payload)

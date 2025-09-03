@@ -6,33 +6,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
-import type { Exercise } from '@/types'
+import type { Exercise, EnrichedWorkoutHistory } from '@/types'
 import { ResponsiveContainer, XAxis, YAxis, Tooltip, AreaChart, Area } from 'recharts'
 import { TrendingUp, TrendingDown, Target, Activity, Zap } from 'lucide-react'
 
 type Metric = 'volume' | 'maxWeight' | 'totalReps' | 'bestSet'
 type TimeRange = '1m' | '3m' | '6m' | '1y'
 
-interface WorkoutHistory {
-    id: string
-    startedAt: string
-    templateName?: string | null
-    exercises?: Array<{
-        exerciseId: string
-        sets: Array<{
-            weight?: number
-            reps?: number
-            restSec?: number
-        }>
-    }>
-}
+
 
 export default function ExerciseProgressPage() {
     const [exercises, setExercises] = useState<Exercise[]>([])
     const [exerciseId, setExerciseId] = useState<string>('')
     const [metric, setMetric] = useState<Metric>('volume')
     const [timeRange, setTimeRange] = useState<TimeRange>('3m')
-    const [histories, setHistories] = useState<WorkoutHistory[]>([])
+    const [histories, setHistories] = useState<EnrichedWorkoutHistory[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -67,7 +55,7 @@ export default function ExerciseProgressPage() {
         // Filter workouts that include the selected exercise
         const relevantWorkouts = histories
             .filter(h => new Date(h.startedAt) >= startDate)
-            .filter(h => h.exercises?.some(e => e.exerciseId === exerciseId))
+            .filter(h => h.exercises?.some(e => e.id === exerciseId))
 
         if (relevantWorkouts.length === 0) return null
 
@@ -90,27 +78,27 @@ export default function ExerciseProgressPage() {
             switch (metric) {
                 case 'volume':
                     value = periodWorkouts.reduce((sum, workout) => {
-                        const exercise = workout.exercises?.find(e => e.exerciseId === exerciseId)
+                        const exercise = workout.exercises?.find(e => e.id === exerciseId)
                         return sum + (exercise?.sets.reduce((setSum, set) =>
-                            setSum + ((set.weight || 0) * (set.reps || 0)), 0) || 0)
+                            setSum + ((set.load || 0) * parseInt(set.reps || '0')), 0) || 0)
                     }, 0)
                     break
                 case 'maxWeight':
                     value = Math.max(...periodWorkouts.map(workout => {
-                        const exercise = workout.exercises?.find(e => e.exerciseId === exerciseId)
-                        return Math.max(...(exercise?.sets.map(set => set.weight || 0) || [0]))
+                        const exercise = workout.exercises?.find(e => e.id === exerciseId)
+                        return Math.max(...(exercise?.sets.map(set => set.load || 0) || [0]))
                     }).filter(w => w > 0))
                     break
                 case 'totalReps':
                     value = periodWorkouts.reduce((sum, workout) => {
-                        const exercise = workout.exercises?.find(e => e.exerciseId === exerciseId)
-                        return sum + (exercise?.sets.reduce((setSum, set) => setSum + (set.reps || 0), 0) || 0)
+                        const exercise = workout.exercises?.find(e => e.id === exerciseId)
+                        return sum + (exercise?.sets.reduce((setSum, set) => setSum + parseInt(set.reps || '0'), 0) || 0)
                     }, 0)
                     break
                 case 'bestSet':
                     value = Math.max(...periodWorkouts.map(workout => {
-                        const exercise = workout.exercises?.find(e => e.exerciseId === exerciseId)
-                        return Math.max(...(exercise?.sets.map(set => (set.weight || 0) * (set.reps || 0)) || [0]))
+                        const exercise = workout.exercises?.find(e => e.id === exerciseId)
+                        return Math.max(...(exercise?.sets.map(set => (set.load || 0) * parseInt(set.reps || '0')) || [0]))
                     }).filter(w => w > 0))
                     break
             }
