@@ -13,11 +13,22 @@ type RealtimeSyncOptions = {
   onSessionUpdate?: (payload: any) => void
   onSetUpdate?: (payload: any) => void
   onConflictDetected?: (payload: any) => void
+  disableConflictNotifications?: boolean
 }
 
 export function useRealtimeSync(options: RealtimeSyncOptions = {}) {
   const { session } = useAuth()
-  const { workoutId, onSessionUpdate, onSetUpdate, onConflictDetected } = options
+  const { workoutId, onSessionUpdate, onSetUpdate, onConflictDetected, disableConflictNotifications = false } = options
+
+  // Generate unique device ID for this session
+  const deviceId = useCallback(() => {
+    let id = localStorage.getItem('device-id')
+    if (!id) {
+      id = `${session?.userId || 'anonymous'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      localStorage.setItem('device-id', id)
+    }
+    return id
+  }, [session?.userId])
 
   const handleRealtimeUpdate = useCallback((payload: any) => {
     console.log('Realtime update received:', payload)
@@ -50,12 +61,22 @@ export function useRealtimeSync(options: RealtimeSyncOptions = {}) {
   const handleConflict = useCallback((payload: any) => {
     console.warn('Realtime conflict detected:', payload)
     onConflictDetected?.(payload)
-    
-    toast.warning('Conflito de sincronização detectado', {
-      description: 'Verifique se há outra sessão ativa em outro dispositivo',
-      duration: 5000
-    })
-  }, [onConflictDetected])
+
+    // Only show toast if notifications are not disabled
+    if (!disableConflictNotifications) {
+      if (payload.type === 'multiple_users') {
+        toast.warning('Múltiplos usuários detectados', {
+          description: 'Outro usuário está editando este treino simultaneamente',
+          duration: 8000
+        })
+      } else {
+        toast.warning('Conflito de sincronização detectado', {
+          description: 'Verifique se há outra sessão ativa',
+          duration: 5000
+        })
+      }
+    }
+  }, [onConflictDetected, disableConflictNotifications])
 
   useEffect(() => {
     if (!session?.userId || !workoutId) return
@@ -126,14 +147,43 @@ export function useRealtimeSync(options: RealtimeSyncOptions = {}) {
           .on('presence', { event: 'sync' }, () => {
             try {
               const state = presenceChannel.presenceState()
-              const users = Object.keys(state)
+              console.log('Presence state:', state)
 
-              if (users.length > 1) {
+              // Get unique users (not counting multiple sessions from same user)
+              const uniqueUsers = new Set()
+              const userSessions = new Map()
+
+              Object.entries(state).forEach(([, presenceData]: [string, any]) => {
+                if (Array.isArray(presenceData) && presenceData.length > 0) {
+                  const userData = presenceData[0] // Take first presence entry
+                  if (userData.user_id) {
+                    uniqueUsers.add(userData.user_id)
+
+                    // Count sessions per user
+                    const currentCount = userSessions.get(userData.user_id) || 0
+                    userSessions.set(userData.user_id, currentCount + presenceData.length)
+                  }
+                }
+              })
+
+              // Only trigger conflict if there are different users (not just multiple sessions of same user)
+              const uniqueUserIds = Array.from(uniqueUsers)
+              if (uniqueUserIds.length > 1) {
+                console.warn('Multiple users detected:', uniqueUserIds)
                 handleConflict({
-                  type: 'multiple_sessions',
-                  users: users,
+                  type: 'multiple_users',
+                  users: uniqueUserIds,
+                  userSessions: Object.fromEntries(userSessions),
                   workoutId
                 })
+              } else if (uniqueUserIds.length === 1) {
+                // Check if same user has multiple sessions (tabs/windows)
+                const userId = uniqueUserIds[0]
+                const sessionCount = userSessions.get(userId) || 0
+                if (sessionCount > 1) {
+                  console.log(`User ${userId} has ${sessionCount} active sessions (tabs/windows)`)
+                  // This is normal behavior, don't trigger conflict
+                }
               }
             } catch (error) {
               console.error('Error handling presence sync:', error)
@@ -143,13 +193,15 @@ export function useRealtimeSync(options: RealtimeSyncOptions = {}) {
             console.log('Presence channel status:', status)
             if (status === 'SUBSCRIBED') {
               try {
-                // Track this session's presence
+                // Track this session's presence with device ID
                 await presenceChannel.track({
                   user_id: session.userId,
                   username: session.username,
+                  device_id: deviceId(),
                   online_at: new Date().toISOString(),
                   workout_id: workoutId
                 })
+                console.log('Presence tracked for user:', session.userId, 'device:', deviceId())
               } catch (error) {
                 console.error('Error tracking presence:', error)
               }
@@ -201,7 +253,28 @@ export function useRealtimeSync(options: RealtimeSyncOptions = {}) {
     }
   }, [session?.userId])
 
+  // Method to manually clear presence state (for debugging)
+  const clearPresence = useCallback(async () => {
+    if (!workoutId) return
+
+    try {
+      const presenceChannel = supabase.channel(`workout-presence-${workoutId}`)
+      await presenceChannel.subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED') {
+          // Clear all presence state for this user
+          await presenceChannel.untrack()
+          console.log('Presence cleared for workout:', workoutId)
+          toast.success('Estado de presença limpo')
+        }
+      })
+    } catch (error) {
+      console.error('Failed to clear presence:', error)
+      toast.error('Falha ao limpar estado de presença')
+    }
+  }, [workoutId])
+
   return {
-    triggerSync
+    triggerSync,
+    clearPresence
   }
 }

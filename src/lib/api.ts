@@ -610,4 +610,83 @@ export const api = {
 
         return { templates: importedTemplates, createdExercises }
     },
+
+    // ===== NEW DATABASE FUNCTIONS FROM MIGRATION =====
+
+    /**
+     * Save session state to database for cross-device sync
+     */
+    async saveSessionState(workoutId: string, deviceId: string, sessionData: any): Promise<{ id: string }> {
+        const { data, error } = await supabase.rpc('save_session_state', {
+            workout_id_param: workoutId,
+            device_id_param: deviceId,
+            session_data_param: JSON.stringify(sessionData)
+        })
+
+        if (error) throw error
+        return data
+    },
+
+    /**
+     * Get latest session state for cross-device sync
+     */
+    async getLatestSessionState(workoutId: string): Promise<{ device_id: string; session_data: any; last_updated: string } | null> {
+        const { data, error } = await supabase.rpc('get_latest_session_state', {
+            workout_id_param: workoutId
+        })
+
+        if (error) throw error
+        return data?.[0] || null
+    },
+
+    /**
+     * Update device sync status
+     */
+    async updateDeviceSyncStatus(deviceId: string, deviceName?: string, isOnline: boolean = true): Promise<{ id: string }> {
+        const { data, error } = await supabase.rpc('update_device_sync_status', {
+            device_id_param: deviceId,
+            device_name_param: deviceName,
+            is_online_param: isOnline
+        })
+
+        if (error) throw error
+        return data
+    },
+
+    /**
+     * Get device sync status
+     */
+    async getDeviceSyncStatus(deviceId: string): Promise<{
+        device_name: string;
+        last_sync_at: string;
+        sync_version: number;
+        is_online: boolean;
+    } | null> {
+        const { data, error } = await supabase.rpc('get_device_sync_status', {
+            device_id_param: deviceId
+        })
+
+        if (error) throw error
+        return data?.[0] || null
+    },
+
+    /**
+     * Clean up old session states (older than 30 days)
+     */
+    async cleanupOldSessionStates(): Promise<number> {
+        const { data, error } = await supabase.rpc('cleanup_old_session_states')
+
+        if (error) throw error
+        return data
+    },
+
+    /**
+     * Clean up processed offline operations (older than 7 days)
+     */
+    async cleanupProcessedOperations(): Promise<number> {
+        const { data, error } = await supabase.rpc('cleanup_processed_operations')
+
+        if (error) throw error
+        return data
+    },
 }

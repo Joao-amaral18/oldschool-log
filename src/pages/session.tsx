@@ -19,6 +19,7 @@ import { sessionStorage, type SessionState, type ExerciseLocalState } from '@/li
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import { SessionSkeleton } from '@/components/skeletons'
 import { SwipeableSet } from '@/components/ui/swipeable-set'
+import { SyncDebugger } from '@/components/debug/SyncDebugger'
 
 
 // Types are now imported from sessionStorage
@@ -80,9 +81,10 @@ export default function SessionPage() {
   const performedExerciseIdsRef = useRef<string[]>([])
   const restTimersRef = useRef<Record<string, { remaining: number; total: number; intervalId?: number; wasInterrupted?: boolean }>>({})
 
-  // Realtime sync setup
+  // Realtime sync setup - notifications disabled to prevent false positives
   useRealtimeSync({
     workoutId,
+    disableConflictNotifications: true, // Disable automatic notifications
     onSessionUpdate: (payload) => {
       console.log('Session updated via realtime:', payload)
       // Handle session updates if needed
@@ -93,7 +95,13 @@ export default function SessionPage() {
     },
     onConflictDetected: (payload) => {
       console.warn('Sync conflict detected:', payload)
-      // Handle conflicts (e.g., show warning to user)
+      // Handle conflicts - now only triggers for actual multi-user conflicts
+      if (payload.type === 'multiple_users') {
+        toast.warning('⚠️ Atenção: Outro usuário está editando este treino', {
+          description: 'Suas mudanças podem conflitar. Considere coordenar com o outro usuário.',
+          duration: 10000
+        })
+      }
     }
   })
 
@@ -148,6 +156,15 @@ export default function SessionPage() {
         setWorkoutId(newWorkoutId)
         startedAtRef.current = Date.parse(started.startedAt as unknown as string) || Date.now()
 
+        // Update device sync status when starting session
+        try {
+          const deviceId = localStorage.getItem('device-id') || `device-${Date.now()}`
+          await api.updateDeviceSyncStatus(deviceId, navigator.userAgent, true)
+          console.log('Device sync status updated for session start')
+        } catch (error) {
+          console.warn('Failed to update device sync status:', error)
+        }
+
         // Map performed exercise ids aligned by index
         performedExerciseIdsRef.current = tpl.exercises.map((te) => started.performedMapByTemplateExerciseId[te.id])
         setPerformedSetsState(tpl.exercises.map(() => []))
@@ -167,35 +184,53 @@ export default function SessionPage() {
           }
         }
 
-        // Try to restore session from IndexedDB
+        // Try to restore session - first check database for cross-device sync, then IndexedDB
         try {
-          const savedSession = await sessionStorage.loadSession(newWorkoutId)
-          if (savedSession && validateExerciseStates(savedSession.exerciseStates, tpl.exercises)) {
-            console.log('Restoring session from IndexedDB:', Object.keys(savedSession.exerciseStates).length, 'exercises')
-            setExerciseStates(savedSession.exerciseStates)
-            startedAtRef.current = savedSession.startedAt
-            setElapsed(Math.floor((Date.now() - savedSession.startedAt) / 1000))
-            performedExerciseIdsRef.current = savedSession.performedExerciseIds || performedExerciseIdsRef.current
-            
+          // Try to get latest session from database (other devices)
+          const dbSession = await sessionStorage.getLatestSessionFromDatabase(newWorkoutId)
+
+          if (dbSession && validateExerciseStates(dbSession.exerciseStates, tpl.exercises)) {
+            console.log('Restoring session from database (cross-device):', Object.keys(dbSession.exerciseStates).length, 'exercises')
+            setExerciseStates(dbSession.exerciseStates)
+            startedAtRef.current = dbSession.startedAt
+            setElapsed(Math.floor((Date.now() - dbSession.startedAt) / 1000))
+            performedExerciseIdsRef.current = dbSession.performedExerciseIds || performedExerciseIdsRef.current
+
             // Restore active rest timers if any
-            if (savedSession.activeRestTimers) {
-              setActiveRestTimers(savedSession.activeRestTimers)
-              restTimersRef.current = savedSession.activeRestTimers
+            if (dbSession.activeRestTimers) {
+              setActiveRestTimers(dbSession.activeRestTimers)
+              restTimersRef.current = dbSession.activeRestTimers
             }
           } else {
-            // Try emergency backup recovery
-            const emergencyBackup = await sessionStorage.recoverFromEmergencyBackup(newWorkoutId)
-            if (emergencyBackup && validateExerciseStates(emergencyBackup.exerciseStates, tpl.exercises)) {
-              console.log('Restoring from emergency backup')
-              setExerciseStates(emergencyBackup.exerciseStates)
-              startedAtRef.current = emergencyBackup.startedAt
-              setElapsed(Math.floor((Date.now() - emergencyBackup.startedAt) / 1000))
+            // Fallback to local IndexedDB
+            const savedSession = await sessionStorage.loadSession(newWorkoutId)
+            if (savedSession && validateExerciseStates(savedSession.exerciseStates, tpl.exercises)) {
+              console.log('Restoring session from IndexedDB:', Object.keys(savedSession.exerciseStates).length, 'exercises')
+              setExerciseStates(savedSession.exerciseStates)
+              startedAtRef.current = savedSession.startedAt
+              setElapsed(Math.floor((Date.now() - savedSession.startedAt) / 1000))
+              performedExerciseIdsRef.current = savedSession.performedExerciseIds || performedExerciseIdsRef.current
+
+              // Restore active rest timers if any
+              if (savedSession.activeRestTimers) {
+                setActiveRestTimers(savedSession.activeRestTimers)
+                restTimersRef.current = savedSession.activeRestTimers
+              }
             } else {
-              setExerciseStates(init)
+              // Try emergency backup recovery
+              const emergencyBackup = await sessionStorage.recoverFromEmergencyBackup(newWorkoutId)
+              if (emergencyBackup && validateExerciseStates(emergencyBackup.exerciseStates, tpl.exercises)) {
+                console.log('Restoring from emergency backup')
+                setExerciseStates(emergencyBackup.exerciseStates)
+                startedAtRef.current = emergencyBackup.startedAt
+                setElapsed(Math.floor((Date.now() - emergencyBackup.startedAt) / 1000))
+              } else {
+                setExerciseStates(init)
+              }
             }
           }
         } catch (error) {
-          console.error('Failed to restore session from IndexedDB:', error)
+          console.error('Failed to restore session:', error)
           setExerciseStates(init)
         }
 
@@ -324,6 +359,7 @@ export default function SessionPage() {
   // Consolidated session persistence with simple throttling
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastSaveTimeRef = useRef<number>(0)
+  const lastDatabaseSaveRef = useRef<number>(0)
 
   const saveSessionThrottled = useCallback(async (
     workoutId: string,
@@ -361,7 +397,16 @@ export default function SessionPage() {
     }
 
     try {
+      // Always save to IndexedDB for local persistence
       await sessionStorage.saveSession(sessionState)
+
+      // Save to database every 30 seconds for cross-device sync
+      if (now - lastDatabaseSaveRef.current > 30000) {
+        const deviceId = localStorage.getItem('device-id') || `device-${Date.now()}`
+        await sessionStorage.saveSessionToDatabase(sessionState, deviceId)
+        lastDatabaseSaveRef.current = now
+      }
+
       // Register session sync for background sync (only on state changes, not periodic)
       await registerSessionSync()
     } catch (error) {
@@ -766,6 +811,11 @@ export default function SessionPage() {
         try {
           await sessionStorage.clearSession(workoutId)
           console.log('Session data cleaned up from IndexedDB')
+
+          // Update device sync status when finishing session
+          const deviceId = localStorage.getItem('device-id') || `device-${Date.now()}`
+          await api.updateDeviceSyncStatus(deviceId, navigator.userAgent, true)
+          console.log('Device sync status updated for session finish')
         } catch (error) {
           console.warn('Failed to clean up session data:', error)
         }
@@ -1161,6 +1211,9 @@ export default function SessionPage() {
           </Button>
         </div>
       )}
+
+      {/* Debug component - remove after fixing sync issues */}
+      <SyncDebugger workoutId={workoutId} />
     </motion.div>
   )
 }

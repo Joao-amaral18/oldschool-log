@@ -4,6 +4,7 @@
 */
 
 import { get, set, del, clear } from 'idb-keyval'
+import { api } from './api'
 
 export type SessionState = {
   workoutId: string
@@ -55,6 +56,37 @@ export class SessionStorageManager {
 
   private getBackupKey(workoutId: string): string {
     return `${BACKUP_KEY_PREFIX}${workoutId}`
+  }
+
+  /**
+   * Save session state to database for cross-device sync
+   */
+  async saveSessionToDatabase(state: SessionState, deviceId: string): Promise<void> {
+    try {
+      // Save to database for cross-device sync
+      await api.saveSessionState(state.workoutId, deviceId, state)
+      console.log('Session saved to database for cross-device sync:', state.workoutId)
+    } catch (error) {
+      console.warn('Failed to save session to database:', error)
+      // Don't throw error, fallback to IndexedDB only
+    }
+  }
+
+  /**
+   * Get latest session state from database (from other devices)
+   */
+  async getLatestSessionFromDatabase(workoutId: string): Promise<SessionState | null> {
+    try {
+      const result = await api.getLatestSessionState(workoutId)
+      if (result && this.validateSessionState(result.session_data)) {
+        console.log('Latest session loaded from database:', workoutId)
+        return result.session_data
+      }
+      return null
+    } catch (error) {
+      console.warn('Failed to load session from database:', error)
+      return null
+    }
   }
 
   /**
