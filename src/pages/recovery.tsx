@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/context/AuthContext"
 import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link } from "react-router-dom"
 import { Mail, ArrowLeft, Shield } from "lucide-react"
 
 export default function RecoveryPage() {
@@ -11,7 +11,6 @@ export default function RecoveryPage() {
     const [success, setSuccess] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const { resetPassword } = useAuth()
-    const navigate = useNavigate()
 
     const handleRecovery = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
