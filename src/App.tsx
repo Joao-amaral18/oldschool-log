@@ -8,13 +8,14 @@ import NotificationPrompt from '@/components/NotificationPrompt'
 function App() {
   const location = useLocation()
   const isLoginPage = location.pathname === '/login'
+  const isSignupPage = location.pathname === '/signup'
 
   // Track user interaction for notification prompt
   const handleUserInteraction = () => {
     localStorage.setItem('user-interacted', 'true')
   }
 
-  if (isLoginPage) {
+  if (isLoginPage || isSignupPage) {
     return (
       <div className="min-h-screen bg-background">
         <Outlet />
