@@ -11,6 +11,7 @@ export default function SignupPage() {
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
     const [error, setError] = useState("")
+    const [success, setSuccess] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const { signup } = useAuth()
     const navigate = useNavigate()
@@ -19,6 +20,7 @@ export default function SignupPage() {
         e.preventDefault()
         setIsLoading(true)
         setError("")
+        setSuccess("")
 
         if (password !== confirmPassword) {
             setError("As senhas não coincidem.")
@@ -29,8 +31,12 @@ export default function SignupPage() {
         try {
             await signup(email, password, username)
             navigate("/")
-        } catch (error) {
-            setError("Erro ao criar conta. Tente novamente.")
+        } catch (error: any) {
+            if (error.message === 'EMAIL_CONFIRMATION_REQUIRED') {
+                setSuccess("Conta criada com sucesso! Verifique seu email e clique no link de confirmação para ativar sua conta.")
+            } else {
+                setError("Erro ao criar conta. Tente novamente.")
+            }
         } finally {
             setIsLoading(false)
         }
@@ -54,6 +60,12 @@ export default function SignupPage() {
                         {error && (
                             <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
                                 <p className="text-sm text-destructive text-center">{error}</p>
+                            </div>
+                        )}
+
+                        {success && (
+                            <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                                <p className="text-sm text-green-600 text-center">{success}</p>
                             </div>
                         )}
 

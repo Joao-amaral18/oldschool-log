@@ -7,6 +7,7 @@ import App from './App'
 import { lazy, Suspense } from 'react'
 const LoginPage = lazy(() => import('./pages/login'))
 const SignupPage = lazy(() => import('./pages/signup'))
+const RecoveryPage = lazy(() => import('./pages/recovery'))
 const TreinoPage = lazy(() => import('./pages/treino'))
 const TemplatesPage = lazy(() => import('./pages/templates/list'))
 const TemplateEditorPage = lazy(() => import('./pages/templates/editor'))
@@ -66,6 +67,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route index element={<Navigate to="/treino" replace />} />
                 <Route path="login" element={<Suspense fallback={null}><LoginPage /></Suspense>} />
                 <Route path="signup" element={<Suspense fallback={null}><SignupPage /></Suspense>} />
+                <Route path="recovery" element={<Suspense fallback={null}><RecoveryPage /></Suspense>} />
                 <Route
                   path="treino"
                   element={

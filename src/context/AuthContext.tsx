@@ -8,6 +8,8 @@ interface AuthContextValue {
   initialized: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, username: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -72,11 +74,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (error) {
+      // Handle specific Supabase error messages
+      if (error.message?.includes('Email not confirmed')) {
+        throw new Error('EMAIL_NOT_CONFIRMED');
+      }
+      if (error.message?.includes('Invalid login credentials')) {
+        throw new Error('INVALID_CREDENTIALS');
+      }
+      // Re-throw other errors as they are
+      throw error;
+    }
     const user = data.user;
     const next = user ? { userId: user.id, username: user.user_metadata?.username || 'Guest' } : null
     setSession(next);
-    try { 
+    try {
       localStorage.setItem('auth:session', next ? JSON.stringify(next) : '')
       if (next) {
         saveAuthSessionForSync(next).catch(console.error)
@@ -93,15 +105,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     });
     if (error) throw error;
+
+    // Don't set session immediately if email confirmation is required
+    // The user needs to confirm their email first
+    if (data.user && !data.user.email_confirmed_at) {
+      throw new Error('EMAIL_CONFIRMATION_REQUIRED');
+    }
+
     const user = data.user;
     const next = user ? { userId: user.id, username } : null
     setSession(next);
-    try { 
+    try {
       localStorage.setItem('auth:session', next ? JSON.stringify(next) : '')
       if (next) {
         saveAuthSessionForSync(next).catch(console.error)
       }
     } catch { }
+  };
+
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    if (error) throw error;
+  };
+
+  const resendConfirmation = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+    });
+    if (error) throw error;
   };
 
   const logout = async () => {
@@ -110,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.removeItem('auth:session') } catch { }
   };
 
-  return <AuthContext.Provider value={{ session, initialized, login, signup, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ session, initialized, login, signup, resetPassword, resendConfirmation, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

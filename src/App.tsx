@@ -9,13 +9,14 @@ function App() {
   const location = useLocation()
   const isLoginPage = location.pathname === '/login'
   const isSignupPage = location.pathname === '/signup'
+  const isRecoveryPage = location.pathname === '/recovery'
 
   // Track user interaction for notification prompt
   const handleUserInteraction = () => {
     localStorage.setItem('user-interacted', 'true')
   }
 
-  if (isLoginPage || isSignupPage) {
+  if (isLoginPage || isSignupPage || isRecoveryPage) {
     return (
       <div className="min-h-screen bg-background">
         <Outlet />

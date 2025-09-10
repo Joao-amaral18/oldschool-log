@@ -10,21 +10,50 @@ export default function LoginPage() {
     const [password, setPassword] = useState("")
     const [error, setError] = useState("")
     const [isLoading, setIsLoading] = useState(false)
-    const { login } = useAuth()
+    const [showResendConfirmation, setShowResendConfirmation] = useState(false)
+    const [isResending, setIsResending] = useState(false)
+    const { login, resendConfirmation } = useAuth()
     const navigate = useNavigate()
 
     const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setIsLoading(true)
         setError("")
+        setShowResendConfirmation(false)
 
         try {
             await login(email, password)
             navigate("/")
-        } catch (error) {
-            setError("Credenciais inválidas. Tente novamente.")
+        } catch (error: any) {
+            if (error.message === 'EMAIL_NOT_CONFIRMED') {
+                setError("Email não confirmado. Verifique sua caixa de entrada e confirme seu email antes de fazer login.")
+                setShowResendConfirmation(true)
+            } else if (error.message === 'INVALID_CREDENTIALS') {
+                setError("Credenciais inválidas. Tente novamente.")
+            } else {
+                setError("Erro ao fazer login. Tente novamente.")
+            }
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const handleResendConfirmation = async () => {
+        if (!email) return
+
+        setIsResending(true)
+        try {
+            await resendConfirmation(email)
+            setError("")
+            setShowResendConfirmation(false)
+            // Show success message
+            setTimeout(() => {
+                alert("Email de confirmação reenviado! Verifique sua caixa de entrada.")
+            }, 100)
+        } catch (error) {
+            setError("Erro ao reenviar email de confirmação.")
+        } finally {
+            setIsResending(false)
         }
     }
 
@@ -46,6 +75,16 @@ export default function LoginPage() {
                         {error && (
                             <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
                                 <p className="text-sm text-destructive text-center">{error}</p>
+                                {showResendConfirmation && (
+                                    <button
+                                        type="button"
+                                        onClick={handleResendConfirmation}
+                                        disabled={isResending}
+                                        className="mt-2 text-xs text-primary hover:text-primary/80 underline disabled:opacity-50"
+                                    >
+                                        {isResending ? "Reenviando..." : "Reenviar email de confirmação"}
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -114,7 +153,16 @@ export default function LoginPage() {
                         </Button>
                     </form>
 
-                    <div className="mt-8 pt-6 border-t border-border text-center">
+                    <div className="mt-8 pt-6 border-t border-border text-center space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                            Esqueceu sua senha?{" "}
+                            <Link
+                                to="/recovery"
+                                className="font-medium text-primary hover:text-primary/80 transition-colors"
+                            >
+                                Recuperar senha
+                            </Link>
+                        </p>
                         <p className="text-sm text-muted-foreground">
                             Não tem uma conta?{" "}
                             <Link
